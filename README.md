@@ -1,5 +1,7 @@
 # HIKARI - Personal AI Assistant
 
+For **v2** (multi-agent daemon, `src/`, `core/`, voice setup), see **[docs/README.md](docs/README.md)** and [docs/QUICKSTART.md](docs/QUICKSTART.md).
+
 HIKARI is a fully voice-controlled AI assistant designed for macOS. It supports intelligent model switching using OpenRouter's free models (68+ in total), fallback AI with Cohere, and performs common assistant tasks like checking the weather, opening apps/websites, and generating dynamic responses using advanced LLMs.
 
 
@@ -19,7 +21,7 @@ HIKARI is a fully voice-controlled AI assistant designed for macOS. It supports 
 1. Clone the repository:
    
 
-   git clone https://github.com/CodewithMukeshkr/HIKARI.git
+   git clone https://github.com/Mukeshkr-19/HIKARI.git
    cd HIKARI
    
 2. Create and activate a virtual environment:
