@@ -25,7 +25,7 @@ HIKARI v2.0 is a fully autonomous, multi-agent AI assistant that:
 ### 2. Configure
 
 ```bash
-cd ~/PycharmProjects/HIKARI
+cd HIKARI
 source .venv/bin/activate
 
 # Edit .env file
@@ -42,8 +42,8 @@ GOOGLE_AI_STUDIO_KEY=your-key-here
 # Text mode (easiest to start)
 python3 hikari.py --text
 
-# Voice mode
-python3 hikari.py
+# Voice mode (wake-word gated, speaker-locked if enrolled)
+python3 hikari.py --voice
 
 # Server only (for phone connections)
 python3 hikari.py --server
@@ -62,8 +62,12 @@ python3 hikari.py --server
 ## Voice Activation
 
 - **Wake Word**: Say "Hikari" to activate
-- **Codename**: Say "harsha27" for fallback (works when sick, noisy environments)
-- **Clap Detection**: Double-clap to activate (when enabled)
+- **Speaker lock (recommended)**: enroll once so only you can activate
+
+```bash
+python3 hikari_daemon.py --enroll-voice
+python3 hikari_daemon.py
+```
 
 ## Commands
 

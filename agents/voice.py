@@ -16,6 +16,7 @@ from pathlib import Path
 from agents.base import BaseAgent
 from core.voice import VoiceSystem, ClapDetector
 from security.auth import VoiceAuth
+from core.speaker_auth import SpeakerAuth
 
 # Codename hash (sha256 of "harsha27")
 CODENAME_HASH = hashlib.sha256("harsha27".encode()).hexdigest()
@@ -29,6 +30,7 @@ class VoiceAgent(BaseAgent):
         super().__init__("voice", "Voice I/O, authentication, and activation")
         self.voice_system = VoiceSystem()
         self.voice_auth = VoiceAuth()
+        self.speaker_auth = SpeakerAuth()
         self.clap_detector = ClapDetector(clap_count=2)
         self.is_authenticated = False
         self.last_auth_time = 0
@@ -62,10 +64,29 @@ class VoiceAgent(BaseAgent):
 
     def listen_once(self, timeout: int = 10) -> Optional[str]:
         """Listen for one voice command"""
-        text = self.voice_system.listen(timeout=timeout)
-        if text:
-            return self.handle(text)
-        return None
+        audio = self.voice_system.listen_audio(timeout=timeout, phrase_time_limit=15)
+        if not audio:
+            return None
+
+        text = None
+        try:
+            text = self.voice_system._recognize_with_whisper(audio)
+        except Exception:
+            text = None
+        if not text:
+            return None
+
+        # Speaker lock after STT: short clips embed poorly if verified before transcription.
+        if self.speaker_auth.is_enrolled():
+            try:
+                emb = self.speaker_auth.embedding_from_speech_recognition_audio(audio)
+                res = self.speaker_auth.verify_embedding(emb)
+                if not res.ok:
+                    return None
+            except Exception:
+                return None
+
+        return self.handle(text)
 
     def speak(self, text: str):
         """Speak text using TTS"""
@@ -110,14 +131,18 @@ class VoiceAgent(BaseAgent):
         return False
 
     def authenticate_voice_print(self, audio_data=None) -> bool:
-        """Authenticate using voice print"""
-        if audio_data:
-            result = self.voice_auth.verify_speaker(audio_data)
-            if result:
+        """Authenticate using speaker verification (enrolled voice)."""
+        if not audio_data:
+            return False
+        try:
+            emb = self.speaker_auth.embedding_from_speech_recognition_audio(audio_data)
+            res = self.speaker_auth.verify_embedding(emb)
+            if res.ok:
                 self.is_authenticated = True
                 self.last_auth_time = time.time()
-            return result
-        return False
+            return bool(res.ok)
+        except Exception:
+            return False
 
     def get_status(self) -> Dict[str, Any]:
         status = super().get_status()

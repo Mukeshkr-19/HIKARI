@@ -44,6 +44,10 @@ js.py
 # Data (keep structure, not content)
 data/*.json
 data/voiceprint.bin
+data/voice_auth.json
+data/voice_memory/
+data/hf_cache/
+data/episodes/
 !data/.gitkeep
 
 # Frontend

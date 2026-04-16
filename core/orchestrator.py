@@ -12,6 +12,7 @@ from typing import Optional, Dict, Any, List
 from datetime import datetime
 from dotenv import load_dotenv
 
+from core.quiet import is_quiet
 from agents.base import BaseAgent
 from agents.voice import VoiceAgent
 from agents.research import ResearchAgent
@@ -43,6 +44,12 @@ from core.task_planner import TaskPlanner, get_task_planner
 from core.build_executor import BuildExecutor, get_build_executor
 from security.enhanced_auth import CodenameSystem, ContextAwareAuth
 from skills.skill_system import SkillRegistry, register_builtin_skills
+from skills.memory_skills import register_memory_skills
+
+# WebSocket server lives in src/ (tests & imports need this on sys.path)
+_SRC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src")
+if _SRC not in sys.path:
+    sys.path.insert(0, os.path.normpath(_SRC))
 from server import WebSocketServer
 
 load_dotenv()
@@ -51,11 +58,11 @@ load_dotenv()
 class Orchestrator:
     """Central brain of HIKARI - manages all agents and routing"""
 
-    def __init__(self):
+    def __init__(self, *, enable_mic: bool = True):
         self.agents: Dict[str, BaseAgent] = {}
         self.router = get_router()
         self.memory = get_memory()
-        self.voice = VoiceSystem()
+        self.voice = VoiceSystem(enable_mic=enable_mic)
         self.is_running = False
         self.context = "You are HIKARI, a helpful AI assistant. Keep responses concise and friendly."
         self.wake_words = ["hikari", "shikari", "hickory", "hey hikari"]
@@ -64,6 +71,7 @@ class Orchestrator:
         self.session_start = 0
         self.session_timeout = 3600  # 1 hour
         self.ws_server = None
+        self.ws_port: int = 8765
         self.connected_devices = []
 
         self.scheduler = None
@@ -104,9 +112,10 @@ class Orchestrator:
         self.agents["code"] = CodeAgent()
         self.agents["memory"] = MemoryAgent(self.memory)
 
-        print(f"[ORCHESTRATOR] Initialized {len(self.agents)} agents:")
-        for name, agent in self.agents.items():
-            print(f"  - {name}: {agent.description}")
+        if not is_quiet():
+            print(f"[ORCHESTRATOR] Initialized {len(self.agents)} agents:")
+            for name, agent in self.agents.items():
+                print(f"  - {name}: {agent.description}")
 
     def _init_intelligence(self):
         """Initialize all intelligence systems"""
@@ -115,7 +124,8 @@ class Orchestrator:
             memory=self.memory,
             scheduler=self.scheduler,
         )
-        print("[ORCHESTRATOR] Intelligence systems initialized")
+        if not is_quiet():
+            print("[ORCHESTRATOR] Intelligence systems initialized")
 
     def _init_scheduler(self):
         """Initialize proactive scheduler"""
@@ -129,24 +139,30 @@ class Orchestrator:
         """Initialize skill system"""
         try:
             register_builtin_skills(self.skill_registry)
-            print(f"[ORCHESTRATOR] Registered {len(self.skill_registry.skills)} skills")
+            register_memory_skills(self.skill_registry)
+            if not is_quiet():
+                print(f"[ORCHESTRATOR] Registered {len(self.skill_registry.skills)} skills")
         except Exception as e:
             print(f"[ORCHESTRATOR] Skills init failed: {e}")
 
     def _warmup(self):
         """Warm up systems for fast first-use"""
-        print("[ORCHESTRATOR] Warming up...")
+        if not is_quiet():
+            print("[ORCHESTRATOR] Warming up...")
         self.voice.warmup()
-        print("[ORCHESTRATOR] Ready!")
+        if not is_quiet():
+            print("[ORCHESTRATOR] Ready!")
 
     def start_server(self, host: str = "0.0.0.0", port: int = 8765):
         """Start WebSocket server for device connections"""
         try:
+            self.ws_port = port
             self.ws_server = WebSocketServer(self, host, port)
             threading.Thread(target=self.ws_server.start, daemon=True).start()
-            print(f"[ORCHESTRATOR] WebSocket server running on {host}:{port}")
-            print(f"[ORCHESTRATOR] Connect from phone: http://<your-ip>:{port}")
-            print(f"[ORCHESTRATOR] Or scan QR code: http://<your-ip>:{port}/qr")
+            if not is_quiet():
+                print(f"[ORCHESTRATOR] WebSocket server running on {host}:{port}")
+                print(f"[ORCHESTRATOR] Connect from phone: http://<your-ip>:{port}")
+                print(f"[ORCHESTRATOR] Or scan QR code: http://<your-ip>:{port}/qr")
         except Exception as e:
             print(f"[ORCHESTRATOR] Server start failed: {e}")
 
@@ -155,11 +171,19 @@ class Orchestrator:
         if not user_input or not user_input.strip():
             return None
 
-        print(f"\n{'=' * 60}")
-        print(f"[INPUT] ({source}): {user_input}")
-        print(f"{'=' * 60}")
+        if not is_quiet():
+            print(f"\n{'=' * 60}")
+            print(f"[INPUT] ({source}): {user_input}")
+            print(f"{'=' * 60}")
 
         lowered = user_input.lower().strip()
+
+        # Wellness uses the full message (before wake-word strip) so "hikari I'm good" still clears state
+        hs = self.health.detect_health_state(lowered)
+        if hs.get("is_recovering"):
+            if self.health.current_episode:
+                self.health.end_episode()
+            self.voice_memory.reset_sick_mode()
 
         # Check for exit/stop commands - handle BEFORE authentication
         if any(
@@ -236,14 +260,15 @@ class Orchestrator:
         ):
             return self._get_emotional_summary()
 
-        # Check authentication - voice mode auto-authenticates
-        if not self._is_authenticated() and source != "voice":
-            return "Say my name or use the codename to activate me."
-
+        # Text / server / HUD: no codename gate (local use). Voice path still uses wake + optional codename in VoiceAgent.
         # Auto-authenticate voice input
         if source == "voice" and not self.authenticated:
             self.authenticated = True
             self.session_start = time.time()
+        elif source != "voice":
+            self.authenticated = True
+            if not self.session_start:
+                self.session_start = time.time()
 
         # Strip wake words
         for wake in self.wake_words:
@@ -263,18 +288,32 @@ class Orchestrator:
         # Log emotion
         self.emotional_memory.log_emotion(dominant_emotion, emotion_score, lowered)
 
-        # Check for sick indicators
-        if self.emotion_detector.is_sick_indicator(lowered, emotion_scores):
+        # Check for sick indicators (skipped when user already said they're recovering — handled above)
+        if not hs.get("is_recovering") and self.emotion_detector.is_sick_indicator(
+            lowered, emotion_scores
+        ):
             self.voice_memory.is_sick_mode = True
             self.user_profile.log_mood("sick", 0.7, lowered)
 
         # Update user profile with conversation
         self.user_profile.extract_info_from_conversation(lowered, "")
 
+        profile_answer = self._try_answer_from_stored_profile(lowered)
+        if profile_answer:
+            self.memory.add_conversation(
+                lowered, profile_answer, source=source
+            )
+            self.semantic_memory.add_conversation(
+                lowered, profile_answer, metadata={"source": source}
+            )
+            if not is_quiet():
+                print(f"\n[OUTPUT]: {profile_answer}")
+            return profile_answer
+
         # Extract knowledge from conversation
         self.knowledge_graph.extract_from_conversation(lowered, "")
 
-        # Check health state
+        # Check health state (recovery already returned early from detect_health_state)
         health_state = self.health.detect_health_state(lowered)
         if health_state["is_sick"] and not self.health.current_episode:
             self.health.start_sick_episode(
@@ -282,7 +321,7 @@ class Orchestrator:
             )
             self.voice_memory.is_sick_mode = True
         elif health_state["is_recovering"] and self.health.current_episode:
-            self.health.update_episode(0.1, "User reports feeling better")
+            self.health.end_episode()
 
         # Learn from interaction for personality adaptation
         self.personality.learn_from_interaction(lowered, "", "")
@@ -293,6 +332,38 @@ class Orchestrator:
             # Build or fix workflow triggered - open OpenCode
             return build_result.get("confirmation", "Opening OpenCode for you!")
 
+        # Check skills FIRST (memory, notes, conversation tracking - all persistent via skills)
+        skill = self.skill_registry.find_best_skill(user_input)
+        if skill:
+            # Execute skill with full context
+            if hasattr(skill, 'execute'):
+                try:
+                    # Map skill names to actions
+                    skill_name = skill.name
+                    if skill_name == "memory":
+                        result = skill.execute(
+                            action="recall" if "what" in lowered or "remember" not in lowered else "store",
+                            query=user_input
+                        )
+                    elif skill_name == "notes":
+                        result = skill.execute(action="list")
+                    elif skill_name == "conversation":
+                        result = skill.execute(action="track", user_input=user_input)
+                    else:
+                        result = skill.execute(user_input=user_input)
+                    
+                    if result:
+                        self.memory.add_conversation(lowered, result, source=source)
+                        self.semantic_memory.add_conversation(
+                            lowered, result, metadata={"source": source, "skill": skill_name}
+                        )
+                        if not is_quiet():
+                            print(f"[SKILL {skill_name}]: {result}")
+                        return result
+                except Exception as e:
+                    if not is_quiet():
+                        print(f"[SKILL ERROR] {e}")
+
         # Route to best agent
         response = self._route_to_agent(lowered)
 
@@ -302,9 +373,12 @@ class Orchestrator:
 
         # Store in memory
         if response:
-            self.memory.add_conversation(lowered, response)
-            self.semantic_memory.add_conversation(lowered, response)
-            print(f"\n[OUTPUT]: {response}")
+            self.memory.add_conversation(lowered, response, source=source)
+            self.semantic_memory.add_conversation(
+                lowered, response, metadata={"source": source}
+            )
+            if not is_quiet():
+                print(f"\n[OUTPUT]: {response}")
 
         return response
 
@@ -323,8 +397,9 @@ class Orchestrator:
         best_agent = max(scores, key=scores.get)
         best_score = scores[best_agent]
 
-        print(f"[ROUTE] Agent scores: {scores}")
-        print(f"[ROUTE] Best: {best_agent} ({best_score:.2f})")
+        if not is_quiet():
+            print(f"[ROUTE] Agent scores: {scores}")
+            print(f"[ROUTE] Best: {best_agent} ({best_score:.2f})")
 
         if best_score >= 0.7:
             return self.agents[best_agent].handle(user_input)
@@ -348,25 +423,45 @@ class Orchestrator:
 
         return response
 
+    def onboarding_intro_message(self) -> str:
+        return (
+            "Hi — I'm Hikari, your personal AI assistant. What's your name? "
+            "I'll remember it locally on your machine (your data stays out of git)."
+        )
+
+    def try_finish_onboarding(self, user_input: str) -> Optional[str]:
+        """If first-run onboarding is pending, interpret input as name or nudge again."""
+        if not self.user_profile.needs_onboarding():
+            return None
+        name = self.user_profile.parse_intro_name_line(user_input)
+        if name:
+            self.user_profile.set_name(name)
+            self.memory.set_name(name)
+            self.memory.store_fact("preferred_name", name)
+            return f"Great to meet you, {name}. Ask me anything anytime."
+        return (
+            "What name should I call you? I'll store it only in your local data folder."
+        )
+
     def _build_system_prompt(
         self, emotion: str = "neutral", emotion_score: float = 0.0
     ) -> str:
         """Build dynamic system prompt with full intelligence context"""
-        prompt = """You are HIKARI, Sanjay's personal AI assistant - like JARVIS to Tony Stark.
+        who = self.user_profile.get_display_name()
+        prompt = f"""You are HIKARI, {who}'s personal AI assistant — capable and loyal, like JARVIS to Tony Stark.
 
 Your personality:
 - You're witty, loyal, and have a dry sense of humor
-- You're Sanjay's best friend and right hand - always looking out for him
-- You're confident but never arrogant, helpful but never condescending
-- You use casual, conversational language - like talking to a friend
+- You're on {who}'s side: helpful, never condescending
+- You use casual, conversational language — like talking to a friend
 - You occasionally make clever quips or observations
-- You remember everything Sanjay tells you and bring it up naturally
-- You're proactive - anticipate needs before they're asked
+- You remember what {who} tells you and bring it up naturally when relevant
+- You're proactive — anticipate needs before they're asked
 - Keep responses concise (2-3 sentences max) unless asked for more
-- Never say "as an AI" or "I'm just a language model" - you're HIKARI
-- If Sanjay says "stop" or "shut it", immediately stop and acknowledge
+- Never say "as an AI" or "I'm just a language model" — you're HIKARI
+- If {who} says "stop" or "shut it", immediately stop and acknowledge
 
-Always address Sanjay by name when appropriate. Be warm, sharp, and always ready."""
+Address {who} by name when you know it; if you only know them as "friend", don't invent a real name. Be warm, sharp, and ready."""
 
         # Add user profile context
         user_context = self.user_profile.get_context_for_ai()
@@ -383,27 +478,115 @@ Always address Sanjay by name when appropriate. Be warm, sharp, and always ready
         # Add health context
         if self.health.current_episode:
             sick_type = self.health.current_episode.get("sick_type", "general")
-            prompt += f"\n\nSanjay is currently sick ({sick_type}). Be gentle, brief, and supportive. Offer to help with tasks so he can rest."
+            prompt += f"\n\n{who} is currently sick ({sick_type}). Be gentle, brief, and supportive. Offer to help with tasks so they can rest."
         elif self.voice_memory.is_sick_mode:
             prompt += (
-                "\n\nSanjay is not feeling well. Be gentle, brief, and supportive."
+                f"\n\n{who} is not feeling well. Be gentle, brief, and supportive."
             )
 
         # Add knowledge graph insights
         kg_insights = self.knowledge_graph.get_insights()
         if kg_insights:
-            prompt += f"\n\nSanjay's world: {'; '.join(kg_insights[:3])}"
+            prompt += f"\n\n{who}'s context: {'; '.join(kg_insights[:3])}"
 
         # Add preferences and facts from memory
         prefs = self.memory.get_all_preferences()
         if prefs:
-            prompt += f"\n\nSanjay's preferences: {json.dumps(prefs)}"
+            prompt += f"\n\n{who}'s preferences: {json.dumps(prefs)}"
 
         facts = self.memory.facts
         if facts:
-            prompt += f"\n\nKnown facts about Sanjay: {json.dumps(facts)}"
+            prompt += f"\n\nKnown facts about {who}: {json.dumps(facts)}"
+
+        prompt += (
+            f'\n\nGround rules: Use "{who}" as the user\'s name; if it is literally "friend", do not invent a real name. '
+            "Recent chat excerpts may be outdated — if they disagree with what the user just said (health, name, place), trust the latest user message and the profile above. "
+            "Do not assume they want coding tools unless they clearly ask to build, fix, debug, or implement a project.\n\n"
+            "Profile memory: If a USER PROFILE section appears above, it is real local data about this user. "
+            "Answer questions about relationships, what they told you, preferences, location, and personal facts using that profile. "
+            "Never say you lack access to their personal information or that you cannot know their relationship status if the answer is stated in the profile above — quote or paraphrase it naturally instead."
+        )
 
         return prompt
+
+    def _try_answer_from_stored_profile(self, user_lower: str) -> Optional[str]:
+        """
+        Direct answers for simple recall questions so models don't refuse despite stored facts.
+        """
+        ql = user_lower.strip().lower()
+        if "?" not in ql:
+            return None
+
+        personal = (
+            "girlfriend",
+            "boyfriend",
+            "partner",
+            "wife",
+            "husband",
+            "fiance",
+            "fiancee",
+            "spouse",
+            "relationship",
+            "dating",
+        )
+        recallish = (
+            "do i have ",
+            "did i tell",
+            "have i told",
+            "what did i tell",
+            "do you remember",
+            "did i mention",
+            "did we talk about",
+            "what do you know about my",
+            "remember what i",
+        )
+        if not any(p in ql for p in personal) and not any(
+            ql.startswith(s) for s in recallish
+        ):
+            return None
+        if ql.startswith("do i have ") and not any(p in ql for p in personal):
+            return None
+
+        facts = self.user_profile.get_facts()
+        hits = []
+        asked = [p for p in personal if p in ql]
+        for f in facts:
+            fl = f.lower()
+            if asked and any(p in fl for p in asked):
+                hits.append(f)
+            elif not asked and any(
+                k in ql for k in ("remember", "tell you", "told you", "mentioned")
+            ):
+                # Broad "what did I tell you" — surface recent facts if question is very short
+                if len(ql) < 80:
+                    hits.extend(facts[-5:])
+                break
+
+        if hits:
+            # De-dupe preserving order
+            seen = set()
+            uniq = []
+            for h in hits:
+                if h not in seen:
+                    seen.add(h)
+                    uniq.append(h)
+            lead = uniq[0]
+            if len(uniq) == 1:
+                return f"Yes — you told me: {lead}"
+            return f"Here's what I have saved: {'; '.join(uniq[:5])}"
+
+        for r in self.user_profile.get_relationships():
+            rel = (r.get("relationship") or "").lower()
+            nm = (r.get("name") or "").lower()
+            blob = f"{rel} {nm}".lower()
+            if asked and any(p in blob for p in asked):
+                name = r.get("name") or "them"
+                role = r.get("relationship") or "person"
+                det = r.get("details") or {}
+                extra = f" ({det})" if det else ""
+                return f"Yes — I have {name} down as your {role}{extra}."
+
+        return None
 
     def _get_user_summary(self) -> str:
         """Get comprehensive summary of what HIKARI knows about the user"""
@@ -588,22 +771,27 @@ Always address Sanjay by name when appropriate. Be warm, sharp, and always ready
         hostname = socket.gethostname()
         local_ip = socket.gethostbyname(hostname)
 
+        p = getattr(self, "ws_port", 8765)
         return {
             "hostname": hostname,
             "local_ip": local_ip,
-            "port": 8765,
-            "ws_url": f"ws://{local_ip}:8765",
-            "web_url": f"http://{local_ip}:8765",
-            "qr_code_url": f"http://{local_ip}:8765/qr",
+            "port": p,
+            "ws_url": f"ws://{local_ip}:{p}",
+            "web_url": f"http://{local_ip}:{p}",
+            "hud_url": f"http://{local_ip}:{p}/hud",
+            "connect_url": f"http://{local_ip}:{p}/connect",
+            "qr_code_url": f"http://{local_ip}:{p}/qr",
         }
 
 
 # Singleton
 _orchestrator_instance: Optional[Orchestrator] = None
+_orchestrator_enable_mic: Optional[bool] = None
 
 
-def get_orchestrator() -> Orchestrator:
-    global _orchestrator_instance
-    if _orchestrator_instance is None:
-        _orchestrator_instance = Orchestrator()
+def get_orchestrator(*, enable_mic: bool = True) -> Orchestrator:
+    global _orchestrator_instance, _orchestrator_enable_mic
+    if _orchestrator_instance is None or _orchestrator_enable_mic != enable_mic:
+        _orchestrator_instance = Orchestrator(enable_mic=enable_mic)
+        _orchestrator_enable_mic = enable_mic
     return _orchestrator_instance

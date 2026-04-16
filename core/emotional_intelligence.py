@@ -237,6 +237,29 @@ class EmotionDetector:
     def is_sick_indicator(self, text: str, voice_scores: Dict = None) -> bool:
         """Check if user might be sick"""
         lower = text.lower()
+        if any(
+            p in lower
+            for p in [
+                "not sick",
+                "not ill",
+                "im good",
+                "i'm good",
+                "im fine",
+                "i'm fine",
+                "im well",
+                "i'm well",
+                "feeling good",
+                "feeling fine",
+                "feeling better",
+                "all good",
+                "better now",
+                "good now",
+                "recovered",
+                "back to normal",
+                "no longer sick",
+            ]
+        ):
+            return False
         sick_words = [
             "sick",
             "ill",

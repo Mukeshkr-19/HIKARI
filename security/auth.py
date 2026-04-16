@@ -1,13 +1,16 @@
 """
 HIKARI v2.0 - Authentication System
-Voice print verification, codename hashing, session management
+
+Public-repo note:
+- No biometric artifacts should be committed.
+- Speaker verification enrollment is stored locally under `data/` and ignored by git.
 """
 
 import os
 import hashlib
 import json
 import time
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -19,102 +22,38 @@ AUTH_FILE = DATA_DIR / "auth.json"
 
 
 class VoiceAuth:
-    """Voice-based authentication using speaker embeddings"""
+    """
+    Backwards-compatible wrapper for speaker verification.
+
+    Historically this file had a placeholder “signature” implementation.
+    We now delegate to `core.speaker_auth.SpeakerAuth` (ECAPA embeddings).
+    """
 
     def __init__(self):
         DATA_DIR.mkdir(exist_ok=True)
         VOICE_PRINT_DIR.mkdir(exist_ok=True)
-        self.enrolled = False
-        self._load_auth_state()
-
-    def _load_auth_state(self):
+        self._speaker = None
         try:
-            if AUTH_FILE.exists():
-                with open(AUTH_FILE, "r") as f:
-                    state = json.load(f)
-                self.enrolled = state.get("enrolled", False)
+            from core.speaker_auth import SpeakerAuth
+
+            self._speaker = SpeakerAuth()
         except Exception:
-            pass
+            self._speaker = None
 
-    def _save_auth_state(self):
-        try:
-            with open(AUTH_FILE, "w") as f:
-                json.dump({"enrolled": self.enrolled}, f)
-        except Exception as e:
-            print(f"[AUTH] Save error: {e}")
-
-    def enroll_voice(self, audio_samples: list) -> bool:
-        """Enroll a voice print from audio samples"""
-        try:
-            # Create a simple voice signature (RMS energy profile)
-            # In production, this would use ECAPA-TDNN embeddings
-            signature = self._compute_voice_signature(audio_samples)
-
-            voice_file = VOICE_PRINT_DIR / "user_voice.json"
-            with open(voice_file, "w") as f:
-                json.dump(
-                    {
-                        "signature": signature,
-                        "enrolled_at": time.time(),
-                        "samples": len(audio_samples),
-                    },
-                    f,
-                )
-
-            self.enrolled = True
-            self._save_auth_state()
-            print("[AUTH] Voice enrolled successfully")
-            return True
-        except Exception as e:
-            print(f"[AUTH] Enrollment error: {e}")
+    def verify_speaker(self, audio) -> bool:
+        """Return True iff the speaker matches the enrolled voice."""
+        if self._speaker is None:
             return False
-
-    def verify_speaker(self, audio_samples: list) -> bool:
-        """Verify speaker against enrolled voice print"""
-        if not self.enrolled:
+        if not self._speaker.is_enrolled():
             return False
-
-        try:
-            voice_file = VOICE_PRINT_DIR / "user_voice.json"
-            if not voice_file.exists():
-                return False
-
-            with open(voice_file, "r") as f:
-                stored = json.load(f)
-
-            current_signature = self._compute_voice_signature(audio_samples)
-            stored_signature = stored.get("signature", "")
-
-            # Simple similarity check (in production, use cosine similarity of embeddings)
-            similarity = self._compute_similarity(current_signature, stored_signature)
-            print(f"[AUTH] Voice similarity: {similarity:.2f}")
-
-            return similarity > 0.7
-        except Exception as e:
-            print(f"[AUTH] Verification error: {e}")
-            return False
-
-    def _compute_voice_signature(self, audio_samples: list) -> str:
-        """Compute a simple voice signature from audio samples"""
-        # Simple approach: hash the audio data
-        # In production, use proper speaker embedding model
-        data = "".join(str(s) for s in audio_samples[:1000])
-        return hashlib.sha256(data.encode()).hexdigest()
-
-    def _compute_similarity(self, sig1: str, sig2: str) -> float:
-        """Compute similarity between two signatures"""
-        if sig1 == sig2:
-            return 1.0
-
-        # Simple character-level similarity
-        matches = sum(1 for a, b in zip(sig1, sig2) if a == b)
-        return matches / max(len(sig1), len(sig2))
+        emb = self._speaker.embedding_from_speech_recognition_audio(audio)
+        res = self._speaker.verify_embedding(emb)
+        return bool(res.ok)
 
     def get_status(self) -> Dict[str, Any]:
-        return {
-            "enrolled": self.enrolled,
-            "voice_print_exists": (VOICE_PRINT_DIR / "user_voice.json").exists(),
-        }
+        if self._speaker is None:
+            return {"enrolled": False, "available": False}
+        return {"enrolled": self._speaker.is_enrolled(), "available": True}
 
 
 class CodenameAuth:

@@ -15,6 +15,8 @@ from typing import Optional, Dict, Any, Set
 from datetime import datetime
 from http import HTTPStatus
 
+from core.quiet import is_quiet
+
 try:
     import websockets
     from websockets.server import serve
@@ -70,6 +72,8 @@ class WebSocketServer:
                 return self._serve_qr_code()
             if path == "/connect":
                 return self._serve_connect_page()
+            if path == "/hud":
+                return self._serve_hud_page()
             if path == "/api/status":
                 return self._serve_api_status()
             return None  # Let WebSocket handle it
@@ -78,12 +82,13 @@ class WebSocketServer:
             handler,
             self.host,
             self.port,
-            process_request=process_request if sys.version_info < (3, 8) else None,
+            process_request=process_request,
         )
 
-        print(f"[WS] Server starting on {self.host}:{self.port}")
-        print(f"[WS] Pairing code: {self.pairing_code}")
-        print(f"[WS] Connect from phone: http://<your-ip>:{self.port}/connect")
+        if not is_quiet():
+            print(f"[WS] Server starting on {self.host}:{self.port}")
+            print(f"[WS] Pairing code: {self.pairing_code}")
+            print(f"[WS] Connect from phone: http://<your-ip>:{self.port}/connect")
 
         self._loop.run_until_complete(start_server)
         self._loop.run_forever()
@@ -110,7 +115,8 @@ class WebSocketServer:
             "type": "unknown",
         }
 
-        print(f"[WS] Client connected ({len(self.connected_clients)} total)")
+        if not is_quiet():
+            print(f"[WS] Client connected ({len(self.connected_clients)} total)")
 
         try:
             async for message in websocket:
@@ -119,7 +125,8 @@ class WebSocketServer:
             print(f"[WS] Client error: {e}")
         finally:
             self.connected_clients.discard(websocket)
-            print(f"[WS] Client disconnected ({len(self.connected_clients)} total)")
+            if not is_quiet():
+                print(f"[WS] Client disconnected ({len(self.connected_clients)} total)")
 
     async def _handle_message(self, websocket, message: str):
         """Process incoming message from client"""
@@ -162,37 +169,69 @@ class WebSocketServer:
                     )
 
             elif msg_type == "message":
-                # Process user message through orchestrator
+                # Process user message through orchestrator (thread + timeout so WS loop stays responsive)
                 user_input = data.get("text", "")
                 if user_input:
-                    response = self.orchestrator.process_input(
-                        user_input, source="device"
-                    )
-                    await websocket.send(
-                        json.dumps(
-                            {
-                                "type": "response",
-                                "text": response or "No response generated",
-                            }
+                    try:
+                        response = await asyncio.wait_for(
+                            asyncio.to_thread(
+                                self.orchestrator.process_input,
+                                user_input,
+                                "device",
+                            ),
+                            timeout=240.0,
                         )
-                    )
+                    except asyncio.TimeoutError:
+                        await websocket.send(
+                            json.dumps(
+                                {
+                                    "type": "error",
+                                    "message": "Request timed out (over 4 minutes). Check API keys / network on the Mac.",
+                                }
+                            )
+                        )
+                    else:
+                        await websocket.send(
+                            json.dumps(
+                                {
+                                    "type": "response",
+                                    "text": response or "No response generated",
+                                }
+                            )
+                        )
 
             elif msg_type == "voice":
                 # Handle voice data from device
                 audio_data = data.get("audio", "")
                 text = data.get("text", "")
                 if text:
-                    response = self.orchestrator.process_input(
-                        text, source="voice_remote"
-                    )
-                    await websocket.send(
-                        json.dumps(
-                            {
-                                "type": "response",
-                                "text": response or "",
-                            }
+                    try:
+                        response = await asyncio.wait_for(
+                            asyncio.to_thread(
+                                self.orchestrator.process_input,
+                                text,
+                                "voice_remote",
+                            ),
+                            timeout=240.0,
                         )
-                    )
+                    except asyncio.TimeoutError:
+                        await websocket.send(
+                            json.dumps(
+                                {
+                                    "type": "error",
+                                    "message": "Voice request timed out. Check the Mac terminal for router/API errors.",
+                                }
+                            )
+                        )
+                    else:
+                        await websocket.send(
+                            json.dumps(
+                                {
+                                    "type": "response",
+                                    "text": response or "",
+                                }
+                            )
+                        )
 
             elif msg_type == "status":
                 status = self.orchestrator._get_status_report()
@@ -418,6 +457,263 @@ class WebSocketServer:
                 pairingCode.addEventListener('keypress', (e) => {
                     if (e.key === 'Enter') pair();
                 });
+            </script>
+        </body>
+        </html>
+        """
+        return HTTPStatus.OK, [("Content-Type", "text/html")], html.encode()
+
+    def _serve_hud_page(self):
+        """Full-screen hologram-style HUD (phone + desktop). Same WebSocket protocol as /connect."""
+        html = """
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <meta name="theme-color" content="#0a1628">
+            <title>HIKARI</title>
+            <style>
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                body {
+                    background: #040814;
+                    color: #e8f4ff;
+                    font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+                    min-height: 100vh;
+                    overflow-x: hidden;
+                }
+                /* Full-screen art: new random landscape on each HUD load (Unsplash — scenic / painterly). */
+                #hud-bg-scene {
+                    position: fixed;
+                    inset: 0;
+                    z-index: 0;
+                    background-color: #0a1628;
+                    background-size: cover;
+                    background-position: center;
+                    background-repeat: no-repeat;
+                    pointer-events: none;
+                }
+                .hud-wrap { position: relative; z-index: 1; display: flex; flex-direction: column; min-height: 100vh; }
+                .hud-header { text-align: center; padding: 1rem; border-bottom: 1px solid rgba(0,255,255,0.12); background: rgba(2,8,20,0.35); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+                .hud-header h1 {
+                    font-size: 1.1rem; letter-spacing: 0.4em; font-weight: 300;
+                    color: rgba(180,230,255,0.9); text-transform: uppercase;
+                }
+                .hud-core {
+                    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+                    padding: 1rem; position: relative;
+                }
+                .holo-stack { position: relative; width: min(72vw, 280px); height: min(72vw, 280px); animation: stack-drift 14s ease-in-out infinite; }
+                .ring {
+                    position: absolute; inset: 0; border-radius: 50%;
+                    border: 2px solid rgba(0,255,255,0.15);
+                    animation: spin 12s linear infinite;
+                }
+                .ring.r2 { inset: 6%; border-color: rgba(100,200,255,0.2); animation-duration: 18s; animation-direction: reverse; }
+                .ring.r3 { inset: 12%; border-color: rgba(0,200,255,0.12); animation-duration: 9s; }
+                .core {
+                    position: absolute; inset: 22%; border-radius: 50%;
+                    background: radial-gradient(circle at 35% 30%, rgba(180,255,255,0.35), rgba(0,120,200,0.15) 40%, transparent 70%);
+                    box-shadow: 0 0 60px rgba(0,200,255,0.35), inset 0 0 40px rgba(255,255,255,0.08);
+                    transition: transform 0.4s ease, box-shadow 0.4s ease;
+                }
+                .core.idle { animation: breeze 9s ease-in-out infinite; }
+                .core.speaking { animation: none; transform: scale(1.08); box-shadow: 0 0 80px rgba(0,255,200,0.5); }
+                .core.thinking { animation: breathe 0.85s ease-in-out infinite; }
+                @keyframes spin { to { transform: rotate(360deg); } }
+                @keyframes stack-drift {
+                    0%, 100% { transform: translate(0, 0) rotate(0deg); }
+                    33% { transform: translate(3px, -4px) rotate(0.8deg); }
+                    66% { transform: translate(-3px, 2px) rotate(-0.6deg); }
+                }
+                @keyframes breeze {
+                    0%, 100% { transform: translate(0, 0) scale(1); filter: brightness(1); }
+                    20% { transform: translate(2px, -2px) scale(1.02); filter: brightness(1.05); }
+                    45% { transform: translate(-2px, 1px) scale(1); filter: brightness(1.02); }
+                    70% { transform: translate(1px, 2px) scale(1.015); filter: brightness(1.04); }
+                }
+                @keyframes breathe { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.05); opacity: 0.9; } }
+                .state-label { margin-top: 1.5rem; font-size: 0.75rem; letter-spacing: 0.25em; color: rgba(150,220,255,0.55); text-transform: uppercase; }
+                .pairing { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; padding: 1.5rem; }
+                .pairing input {
+                    background: rgba(0,40,80,0.4); border: 1px solid rgba(0,255,255,0.25);
+                    border-radius: 12px; padding: 14px; color: #fff; font-size: 1.4rem; text-align: center;
+                    width: 200px; letter-spacing: 0.4em; margin: 1rem 0;
+                }
+                .pairing button, .input-area button {
+                    background: linear-gradient(135deg, rgba(0,200,255,0.35), rgba(100,100,255,0.35));
+                    border: 1px solid rgba(0,255,255,0.35); border-radius: 12px; padding: 14px 36px; color: #fff;
+                    font-size: 1rem; cursor: pointer;
+                }
+                .chat { flex: 1; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: 10px; max-height: 40vh; }
+                .message { max-width: 90%; padding: 10px 14px; border-radius: 14px; font-size: 0.95rem; line-height: 1.45; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+                .message.user { align-self: flex-end; background: rgba(0,120,200,0.42); border: 1px solid rgba(0,255,255,0.28); }
+                .message.ai { align-self: flex-start; background: rgba(0,30,60,0.58); border: 1px solid rgba(0,200,255,0.22); }
+                .input-area { padding: 1rem; border-top: 1px solid rgba(0,255,255,0.1); display: flex; gap: 10px; background: rgba(2,8,20,0.4); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+                .input-area input { flex: 1; background: rgba(0,40,80,0.35); border: 1px solid rgba(0,255,255,0.2); border-radius: 12px; padding: 12px 16px; color: #fff; font-size: 1rem; }
+                .hidden { display: none !important; }
+                .status { font-size: 0.75rem; color: rgba(150,200,255,0.5); margin-top: 0.25rem; }
+                .status.ok { color: #4ade80; }
+            </style>
+        </head>
+        <body>
+            <div id="hud-bg-scene" aria-hidden="true"></div>
+            <div class="hud-wrap">
+                <div class="hud-header"><h1>HIKARI</h1><div id="st" class="status">Offline</div></div>"""
+        html += """
+                <div id="pairing-screen" class="pairing">
+                    <div class="holo-stack">
+                        <div class="ring"></div><div class="ring r2"></div><div class="ring r3"></div>
+                        <div id="core" class="core idle"></div>
+                    </div>
+                    <p class="state-label">Enter pairing code</p>
+                    <input type="text" id="pairing-code" placeholder="000000" maxlength="6" autocomplete="off">
+                    <button onclick="pair()">Connect</button>
+                </div>
+                <div id="chat-screen" class="hidden" style="height:100%;display:flex;flex-direction:column;">
+                    <div class="hud-core">
+                        <div class="holo-stack">
+                            <div class="ring"></div><div class="ring r2"></div><div class="ring r3"></div>
+                            <div id="core2" class="core idle"></div>
+                        </div>
+                        <p id="lbl" class="state-label">Ready</p>
+                    </div>
+                    <div id="chat-messages" class="chat"></div>
+                    <div class="input-area">
+                        <input type="text" id="message-input" placeholder="Command HIKARI..." autocomplete="off">
+                        <button onclick="sendMessage()">Send</button>
+                    </div>
+                </div>
+            </div>
+            <script>
+                (function pickHudBackground() {
+                    var ov = 'linear-gradient(180deg, rgba(4,10,24,0.82) 0%, rgba(8,20,40,0.55) 45%, rgba(2,6,16,0.92) 100%)';
+                    var urls = [
+                        'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=1920&q=80',
+                        'https://images.unsplash.com/photo-1469474968028-56623f2e60e4?auto=format&fit=crop&w=1920&q=80',
+                        'https://images.unsplash.com/photo-1472214103451-9374bd1c798e?auto=format&fit=crop&w=1920&q=80',
+                        'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1920&q=80',
+                        'https://images.unsplash.com/photo-1433086966358-54859d0ed716?auto=format&fit=crop&w=1920&q=80',
+                        'https://images.unsplash.com/photo-1490806843957-31f4c9a91c65?auto=format&fit=crop&w=1920&q=80',
+                        'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=1920&q=80',
+                        'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1920&q=80',
+                        'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1920&q=80',
+                        'https://images.unsplash.com/photo-1519904981063-b0cf448d479e?auto=format&fit=crop&w=1920&q=80',
+                        'https://images.unsplash.com/photo-1523712999610-f77fbcfc3843?auto=format&fit=crop&w=1920&q=80',
+                        'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=1920&q=80'
+                    ];
+                    var u = urls[Math.floor(Math.random() * urls.length)];
+                    var el = document.getElementById('hud-bg-scene');
+                    if (el) el.style.backgroundImage = ov + ', url(' + u + ')';
+                })();
+
+                let ws = null;
+                let replyTimer = null;
+                const pairingCode = document.getElementById('pairing-code');
+                const pairingScreen = document.getElementById('pairing-screen');
+                const chatScreen = document.getElementById('chat-screen');
+                const chatMessages = document.getElementById('chat-messages');
+                const messageInput = document.getElementById('message-input');
+                const st = document.getElementById('st');
+                const core2 = document.getElementById('core2');
+                const lbl = document.getElementById('lbl');
+
+                function clearReplyTimer() {
+                    if (replyTimer) { clearTimeout(replyTimer); replyTimer = null; }
+                }
+
+                function setOrb(mode) {
+                    core2.classList.remove('idle', 'thinking', 'speaking');
+                    if (mode === 'idle') core2.classList.add('idle');
+                    if (mode === 'thinking') core2.classList.add('thinking');
+                    if (mode === 'speaking') core2.classList.add('speaking');
+                }
+
+                function resetAfterSend() {
+                    clearReplyTimer();
+                    setOrb('idle');
+                    lbl.textContent = 'Ready';
+                }
+
+                function pair() {
+                    const code = pairingCode.value.trim();
+                    if (code.length !== 6) return;
+                    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                    ws = new WebSocket(protocol + '//' + window.location.host);
+                    ws.onopen = () => {
+                        ws.send(JSON.stringify({ type: 'pair', code: code, device_type: 'mobile' }));
+                    };
+                    ws.onmessage = (event) => {
+                        let data;
+                        try { data = JSON.parse(event.data); } catch (e) {
+                            addMessage('Bad message from server.', 'ai');
+                            resetAfterSend();
+                            return;
+                        }
+                        if (data.type === 'welcome') return;
+                        if (data.type === 'paired') {
+                            pairingScreen.classList.add('hidden');
+                            chatScreen.classList.remove('hidden');
+                            chatScreen.style.display = 'flex';
+                            st.textContent = 'Linked';
+                            st.classList.add('ok');
+                            lbl.textContent = 'Ready';
+                            setOrb('idle');
+                            addMessage('Connected. Your Mac runs HIKARI — commands execute there.', 'ai');
+                        } else if (data.type === 'pair_error') {
+                            alert('Invalid pairing code.');
+                        } else if (data.type === 'error') {
+                            clearReplyTimer();
+                            setOrb('idle');
+                            lbl.textContent = 'Error';
+                            addMessage('Error: ' + (data.message || 'unknown'), 'ai');
+                        } else if (data.type === 'response') {
+                            clearReplyTimer();
+                            setOrb('speaking');
+                            lbl.textContent = 'Speaking';
+                            addMessage(data.text, 'ai');
+                            setTimeout(() => { setOrb('idle'); lbl.textContent = 'Ready'; }, 1500);
+                        }
+                    };
+                    ws.onerror = () => {
+                        st.textContent = 'Connection error';
+                        st.classList.remove('ok');
+                        resetAfterSend();
+                    };
+                    ws.onclose = () => { st.textContent = 'Disconnected'; st.classList.remove('ok'); clearReplyTimer(); setOrb('idle'); };
+                }
+
+                function sendMessage() {
+                    const text = messageInput.value.trim();
+                    if (!text || !ws) return;
+                    if (ws.readyState !== WebSocket.OPEN) {
+                        addMessage('Not connected. Refresh and pair again.', 'ai');
+                        return;
+                    }
+                    clearReplyTimer();
+                    setOrb('thinking');
+                    lbl.textContent = 'Sending';
+                    addMessage(text, 'user');
+                    ws.send(JSON.stringify({ type: 'message', text: text }));
+                    messageInput.value = '';
+                    replyTimer = setTimeout(() => {
+                        setOrb('idle');
+                        lbl.textContent = 'Timed out';
+                        addMessage('No reply yet (4+ min). Check the Mac running HIKARI — terminal errors or API keys.', 'ai');
+                        replyTimer = null;
+                    }, 250000);
+                }
+
+                function addMessage(text, type) {
+                    const div = document.createElement('div');
+                    div.className = 'message ' + type;
+                    div.textContent = text;
+                    chatMessages.appendChild(div);
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                }
+
+                messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
+                pairingCode.addEventListener('keypress', (e) => { if (e.key === 'Enter') pair(); });
             </script>
         </body>
         </html>

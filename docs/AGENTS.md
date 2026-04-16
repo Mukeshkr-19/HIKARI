@@ -36,7 +36,7 @@ Personal AI assistant project with multi-agent architecture and voice capabiliti
 
 ## Quick Start
 ```bash
-cd PycharmProjects/HIKARI
+cd HIKARI
 python hikari.py
 # or
 python server.py

@@ -60,7 +60,7 @@ load_dotenv()
 class VoiceSystem:
     """Handles all voice I/O operations with Whisper as primary"""
 
-    def __init__(self):
+    def __init__(self, *, enable_mic: bool = True):
         self.recognizer = sr.Recognizer() if SR_AVAILABLE else None
         self.is_listening = False
         self._audio = None
@@ -68,11 +68,29 @@ class VoiceSystem:
         self._mic_index = 0
         self._whisper_model = None
         self._use_whisper = True  # Use Whisper by default
+        self._enable_mic = enable_mic
 
         if self.recognizer:
             self.recognizer.energy_threshold = 4000
             self.recognizer.dynamic_energy_threshold = True
             self.recognizer.pause_threshold = 0.8
+
+    def listen_audio(self, timeout: int = 10, phrase_time_limit: int = 15):
+        """Listen and return raw AudioData (no transcription)."""
+        if not self._enable_mic:
+            return None
+        if not SR_AVAILABLE:
+            return None
+        try:
+            with sr.Microphone(device_index=self._mic_index) as source:
+                if not self._warmup_done:
+                    self.recognizer.adjust_for_ambient_noise(source, duration=1)
+                audio = self.recognizer.listen(
+                    source, timeout=timeout, phrase_time_limit=phrase_time_limit
+                )
+            return audio
+        except Exception:
+            return None
 
     def _find_best_mic(self):
         """Find the best microphone (prefer built-in)"""
@@ -105,6 +123,8 @@ class VoiceSystem:
 
     def warmup(self):
         """Warm up microphone"""
+        if not self._enable_mic:
+            return
         if not SR_AVAILABLE or not PYAUDIO_AVAILABLE:
             return
         try:
@@ -130,6 +150,8 @@ class VoiceSystem:
 
     def listen(self, timeout: int = 10, phrase_time_limit: int = 15) -> Optional[str]:
         """Listen for speech and return recognized text using Whisper"""
+        if not self._enable_mic:
+            return None
         if not SR_AVAILABLE:
             print("[VOICE] SpeechRecognition not available")
             return None
@@ -139,13 +161,10 @@ class VoiceSystem:
             self._load_whisper()
 
         try:
-            with sr.Microphone(device_index=self._mic_index) as source:
-                if not self._warmup_done:
-                    self.recognizer.adjust_for_ambient_noise(source, duration=1)
-                print("[VOICE] Listening... (speak now)")
-                audio = self.recognizer.listen(
-                    source, timeout=timeout, phrase_time_limit=phrase_time_limit
-                )
+            print("[VOICE] Listening... (speak now)")
+            audio = self.listen_audio(timeout=timeout, phrase_time_limit=phrase_time_limit)
+            if audio is None:
+                return None
 
             # Try Whisper first (local, works with any accent)
             if self._use_whisper and self._whisper_model:

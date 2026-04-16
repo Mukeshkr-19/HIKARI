@@ -57,7 +57,7 @@ class SystemAgent(BaseAgent):
         if any(w in lowered for w in ["stop music", "pause music", "stop playing"]):
             return self.control_music("pause")
 
-        # Call someone - "call labib" or "call dad" or "call sanjay"
+        # Call someone - "call Alex" or "call dad"
         if lowered.startswith("call "):
             name = lowered[5:].strip()  # Get everything after "call "
             if name:

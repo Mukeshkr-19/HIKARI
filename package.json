@@ -1,0 +1,19 @@
+{
+  "name": "hikari-assistant",
+  "version": "2.0.0",
+  "private": true,
+  "description": "HIKARI — local-first voice + multi-agent assistant (Python). Use npm scripts as shortcuts after clone.",
+  "scripts": {
+    "setup": "bash install.sh",
+    "start": "bash -c 'test -d .venv && . .venv/bin/activate; exec python src/hikari.py --text'",
+    "voice": "bash -c 'test -d .venv && . .venv/bin/activate; exec python src/hikari.py --voice'",
+    "server": "bash -c 'test -d .venv && . .venv/bin/activate; exec python src/hikari.py --server'",
+    "daemon": "bash -c 'test -d .venv && . .venv/bin/activate; exec python src/hikari_daemon.py'",
+    "enroll": "bash -c 'test -d .venv && . .venv/bin/activate; exec python src/hikari_daemon.py --enroll-voice'",
+    "login-agent": "bash scripts/install-hikari-login-agent.sh",
+    "login-agent-uninstall": "bash scripts/uninstall-hikari-login-agent.sh"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

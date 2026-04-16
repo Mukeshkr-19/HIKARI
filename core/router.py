@@ -13,6 +13,8 @@ from dataclasses import dataclass, field
 from collections import defaultdict
 from dotenv import load_dotenv
 
+from core.quiet import is_quiet
+
 try:
     import litellm
 
@@ -37,9 +39,9 @@ PROVIDER_CONFIGS = {
         "api_key_env": "GOOGLE_AI_STUDIO_KEY",
         "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
         "models": {
-            "fast": "gemini-2.0-flash",
-            "balanced": "gemini-2.0-flash",
-            "smart": "gemini-2.5-pro",
+            "fast": "gemini-2.5-flash",
+            "balanced": "gemini-2.5-flash",
+            "smart": "gemini-2.5-flash",
         },
         "rate_limit_rpm": 15,
         "max_tokens_per_min": 250000,
@@ -178,12 +180,13 @@ class AIRouter:
                 name=name,
                 available=bool(api_key) or is_ollama,
             )
-            if is_ollama:
-                print(f"[ROUTER] {name}: local (always available)")
-            elif api_key:
-                print(f"[ROUTER] {name}: configured")
-            else:
-                print(f"[ROUTER] {name}: not configured (skipping)")
+            if not is_quiet():
+                if is_ollama:
+                    print(f"[ROUTER] {name}: local (always available)")
+                elif api_key:
+                    print(f"[ROUTER] {name}: configured")
+                else:
+                    print(f"[ROUTER] {name}: not configured (skipping)")
 
     def _get_api_key(self, provider: str) -> Optional[str]:
         config = PROVIDER_CONFIGS[provider]
@@ -337,93 +340,63 @@ class AIRouter:
         temperature: float,
         api_key: str,
     ) -> Optional[str]:
-        """Call Google AI Studio directly via Google GenAI SDK"""
+        """Call Google AI Studio generateContent over HTTPS (no google-genai package)."""
         if not api_key:
             return None
 
-        try:
-            from google import genai
-
-            client = genai.Client(api_key=api_key)
-
-            # Build content from messages
-            system_prompt = ""
-            user_content = ""
-            for msg in messages:
-                if msg["role"] == "system":
-                    system_prompt = msg["content"]
-                elif msg["role"] == "user":
-                    user_content = msg["content"]
-
-            # Combine system prompt with user content
-            full_prompt = (
-                f"{system_prompt}\n\n{user_content}" if system_prompt else user_content
-            )
-
-            response = client.models.generate_content(
-                model=model,
-                contents=full_prompt,
-                config=genai.types.GenerateContentConfig(
-                    max_output_tokens=max_tokens,
-                    temperature=temperature,
-                ),
-            )
-            if response and response.text:
-                return response.text.strip()
-            return None
-        except Exception as e:
-            error_str = str(e)
-            if "429" in error_str or "quota" in error_str.lower():
-                print(f"[ROUTER] Google rate limited (429)")
-            else:
-                print(f"[ROUTER] Google GenAI error: {e}")
-            return None
-
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-
-        # Convert messages to Google format
-        contents = []
-        for msg in messages:
-            if msg["role"] == "system":
-                # System prompt goes in system_instruction
-                continue
-            contents.append({"parts": [{"text": msg["content"]}]})
-
-        # Extract system prompt
         system_instruction = None
+        contents: list = []
         for msg in messages:
-            if msg["role"] == "system":
-                system_instruction = msg["content"]
-                break
+            role = msg.get("role", "user")
+            text = (msg.get("content") or "").strip()
+            if not text:
+                continue
+            if role == "system":
+                system_instruction = text
+                continue
+            if role == "assistant":
+                contents.append({"role": "model", "parts": [{"text": text}]})
+            else:
+                contents.append({"role": "user", "parts": [{"text": text}]})
 
-        payload = {
+        if not contents:
+            return None
+
+        url = (
+            "https://generativelanguage.googleapis.com/v1beta/models/"
+            f"{model}:generateContent?key={api_key}"
+        )
+
+        payload: Dict[str, Any] = {
             "contents": contents,
             "generationConfig": {
                 "maxOutputTokens": max_tokens,
                 "temperature": temperature,
             },
         }
-
         if system_instruction:
             payload["systemInstruction"] = {"parts": [{"text": system_instruction}]}
 
         try:
-            response = requests.post(url, json=payload, timeout=30)
+            response = requests.post(url, json=payload, timeout=60)
             if response.status_code == 200:
                 result = response.json()
                 if "candidates" in result and result["candidates"]:
-                    return result["candidates"][0]["content"]["parts"][0][
-                        "text"
-                    ].strip()
+                    parts = result["candidates"][0].get("content", {}).get("parts") or []
+                    if parts and "text" in parts[0]:
+                        return parts[0]["text"].strip()
             elif response.status_code == 429:
-                print(f"[ROUTER] Google rate limited (429)")
+                if not is_quiet():
+                    print("[ROUTER] Google rate limited (429)")
             else:
-                print(
-                    f"[ROUTER] Google HTTP {response.status_code}: {response.text[:200]}"
-                )
+                if not is_quiet():
+                    print(
+                        f"[ROUTER] Google HTTP {response.status_code}: {response.text[:200]}"
+                    )
             return None
         except Exception as e:
-            print(f"[ROUTER] Google direct API error: {e}")
+            if not is_quiet():
+                print(f"[ROUTER] Google REST error: {e}")
             return None
 
     def _call_direct_api(
@@ -575,7 +548,8 @@ class AIRouter:
         task_type = self._classify_task(user_input)
         quality = self._get_quality_level(task_type)
 
-        print(f"[ROUTER] Task: {task_type}, Quality: {quality}")
+        if not is_quiet():
+            print(f"[ROUTER] Task: {task_type}, Quality: {quality}")
 
         messages = self._build_messages(system_prompt, user_input, context)
 
@@ -588,7 +562,8 @@ class AIRouter:
         config = PROVIDER_CONFIGS[provider]
         model = config["models"][quality]
 
-        print(f"[ROUTER] Trying {provider}/{model}")
+        if not is_quiet():
+            print(f"[ROUTER] Trying {provider}/{model}")
 
         response = self._try_generate(
             provider, model, messages, max_tokens, temperature
@@ -596,7 +571,8 @@ class AIRouter:
 
         # Fallback chain
         if not response:
-            print(f"[ROUTER] Primary provider {provider} failed, trying fallbacks...")
+            if not is_quiet():
+                print(f"[ROUTER] Primary provider {provider} failed, trying fallbacks...")
             for fallback_name in FALLBACK_CHAIN:
                 if fallback_name == provider:
                     continue
@@ -608,7 +584,8 @@ class AIRouter:
 
                 fallback_config = PROVIDER_CONFIGS[fallback_name]
                 fallback_model = fallback_config["models"][quality]
-                print(f"[ROUTER] Trying fallback: {fallback_name}/{fallback_model}")
+                if not is_quiet():
+                    print(f"[ROUTER] Trying fallback: {fallback_name}/{fallback_model}")
 
                 response = self._try_generate(
                     fallback_name, fallback_model, messages, max_tokens, temperature
@@ -624,7 +601,8 @@ class AIRouter:
             self.providers[provider].last_request_time = time.time()
             self.usage_stats[provider]["requests"] += 1
             self.usage_stats[provider]["tokens"] += len(response.split())
-            print(f"[ROUTER] Success with {provider}/{model}")
+            if not is_quiet():
+                print(f"[ROUTER] Success with {provider}/{model}")
         else:
             print("[ROUTER] All providers failed")
 

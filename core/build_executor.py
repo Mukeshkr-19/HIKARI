@@ -158,7 +158,7 @@ def detect_tech_stack(request: str) -> str:
 
     if "react" in request:
         return "React + Tailwind CSS"
-    elif "vue" in request:
+    elif re.search(r"\bvue\b", request):
         return "Vue.js + Tailwind"
     elif "angular" in request:
         return "Angular"
@@ -166,13 +166,13 @@ def detect_tech_stack(request: str) -> str:
         return "Python"
     elif "django" in request:
         return "Django"
-    elif "node" in request or "express" in request:
+    elif re.search(r"\bnode\b", request) or "express" in request:
         return "Node.js + Express"
     elif "html" in request:
         return "HTML + CSS + JavaScript"
     elif "rust" in request:
         return "Rust"
-    elif "go" in request or "golang" in request:
+    elif re.search(r"\bgolang\b", request) or re.search(r"\bgo\b", request):
         return "Go"
 
     for key, value in SMART_DEFAULTS.items():
@@ -207,9 +207,18 @@ def classify_request(request: str) -> str:
         if word in request:
             return "refactor"
 
-    feature_words = ["add", "feature", "implement", "new", "enhance", "upgrade"]
-    for word in feature_words:
-        if word in request:
+    # Avoid bare "add" / "new" — they match casual chat ("good", "add dont worry").
+    feature_phrases = [
+        "add feature",
+        "add a feature",
+        "new feature",
+        "implement",
+        "enhancement",
+        "enhance",
+        "upgrade",
+    ]
+    for phrase in feature_phrases:
+        if phrase in request:
             return "feature"
 
     build_words = [
@@ -363,7 +372,8 @@ class BuildExecutor:
             return await self._execute_build(request, {})
 
         tech = detect_tech_stack(request)
-        if tech:
+        # Only auto-launch OpenCode for clear build/fix intent — not "feature" guesses from loose wording.
+        if tech and task_type in ("build", "fix", "refactor"):
             return await self._execute_build(request, {"tech": tech})
 
         return {

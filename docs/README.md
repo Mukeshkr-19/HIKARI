@@ -18,7 +18,7 @@
 ### 1. Install Dependencies
 
 ```bash
-cd ~/PycharmProjects/HIKARI
+cd HIKARI
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -63,7 +63,7 @@ python3 hikari.py --port 9000
 
 1. Start HIKARI on your laptop
 2. Note the IP address and port shown in the terminal
-3. On your phone, open: `http://<your-laptop-ip>:8765/connect`
+3. On your phone, open: `http://<your-laptop-ip>:8765/hud` (hologram HUD) or `/connect`
 4. Or scan the QR code: `http://<your-laptop-ip>:8765/qr`
 5. Enter the 6-digit pairing code shown on your laptop
 
@@ -72,9 +72,16 @@ python3 hikari.py --port 9000
 ## Voice Activation
 
 - **Wake Word**: Say "Hikari" to activate
-- **Codename**: Say "harsha27" for fallback authentication
+- **Speaker lock (recommended)**: enroll your voice so only you can activate
 - **Clap Detection**: Double-clap to activate (when enabled)
-- **Voice Print**: Train your voice for biometric auth (optional)
+- **Codename**: optional fallback authentication (set your own in `.env`)
+
+### Enroll your voice (speaker verification)
+
+```bash
+python src/hikari_daemon.py --enroll-voice
+python src/hikari_daemon.py
+```
 
 ## Commands
 
@@ -116,8 +123,8 @@ hikari/
 ├── config/                  # Configuration files
 ├── data/                    # Runtime data (memory, voice prints)
 ├── hikari-frontend/         # Next.js PWA (optional)
-├── server.py                # WebSocket + HTTP server
-├── hikari.py                # Main entry point
+├── src/server.py            # WebSocket + HTTP server
+├── src/hikari.py            # Main entry point
 ├── requirements.txt         # Python dependencies
 └── .env.example             # Environment template
 ```

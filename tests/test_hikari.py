@@ -170,8 +170,8 @@ class TestFileAgent(unittest.TestCase):
         from agents.files import FileAgent
 
         agent = FileAgent()
-        # Test with home directory
-        result = agent.file_info(str(Path.home()))
+        # Test with a whitelisted directory
+        result = agent.file_info(str(Path.home() / "Documents"))
         self.assertIn("Name:", result)
 
 

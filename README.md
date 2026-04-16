@@ -1,100 +1,214 @@
-# HIKARI - Personal AI Assistant
+# HIKARI
 
-For **v2** (multi-agent daemon, `src/`, `core/`, voice setup), see **[docs/README.md](docs/README.md)** and [docs/QUICKSTART.md](docs/QUICKSTART.md).
+**Local-first “JARVIS-style” assistant for macOS** — wake word, speaker lock, multi-agent brain, Mac automation, learning from corrections, and a phone HUD that talks to your Mac.
 
-HIKARI is a fully voice-controlled AI assistant designed for macOS. It supports intelligent model switching using OpenRouter's free models (68+ in total), fallback AI with Cohere, and performs common assistant tasks like checking the weather, opening apps/websites, and generating dynamic responses using advanced LLMs.
+Everything you need lives **inside this repository** after you clone it (virtualenv, `data/`, `.env`). No hardcoded machine paths.
 
+---
 
-## Features
-- 🎙️ Real-time voice interaction using SpeechRecognition + PyAudio  
-- 🌤️ Weather updates (via OpenWeatherMap API)  
-- 🧠 Smart AI responses using **OpenRouter (60+ models)** and **Cohere** fallback  
-- 📶 Automatic model switching with token usage tracking  
-- 🔁 Built-in fallback to chat models or Cohere when primary is at capacity  
-- 🖥️ Open any installed macOS application with voice  
-- 🌐 Launch websites hands-free  
-- ⏰ Speak current time and date  
-- 🚀 Startup warmup for microphone and DNS resolution  
-- 🧠 Categorized model routing (chat, code, math, reasoning, logic, etc.)
+## Requirements
 
-## Installation
-1. Clone the repository:
-   
+- **macOS** (primary target; voice + `say` TTS + AppleScript automation)
+- **Python 3.10+** (3.12 recommended)
+- **Node.js 18+** (optional — only if you use `npm run …` shortcuts)
 
-   git clone https://github.com/Mukeshkr-19/HIKARI.git
-   cd HIKARI
-   
-2. Create and activate a virtual environment:
+---
 
-   python3 -m venv .venv
-   
-   source .venv/bin/activate
-   
-3. Install dependencies:
-   pip install -r requirements.txt
+## Install (any Mac — portable)
 
-4. Platform Compatibility:
-   HIKARI supports macOS, Windows, and Linux for text-to-speech (TTS) using native/system tools or pyttsx3.
+### Option A — `git clone` + install script (recommended)
 
-🖥️ macOS
-Uses the built-in say command. No extra setup needed.
+```bash
+git clone https://github.com/Mukeshkr-19/HIKARI.git
+cd HIKARI
+chmod +x install.sh
+./install.sh
+```
 
-🪟 Windows
-Uses pyttsx3 for offline speech synthesis.
+This creates `.venv` in the repo, installs Python dependencies, and copies `.env.example` → `.env` if `.env` is missing.
 
-No additional installation required beyond pip install -r requirements.txt.
+### Option B — One-liner (downloads `install.sh` from GitHub)
 
-🐧 Linux
-Uses espeak for TTS. You must install it manually:
+Replace `main` with your branch if needed:
 
-sudo apt install espeak
+```bash
+curl -fsSL https://raw.githubusercontent.com/Mukeshkr-19/HIKARI/main/install.sh | bash
+```
 
-5. Set up environment variables:
+Then `cd` into the folder you cloned (the script is meant to be run **inside** the repo after clone; the canonical flow is still **clone first**, then `./install.sh` from the repo root).
 
-   Create a .env file in the root of your project directory.
-   Add the following lines to the .env file, replacing your-cohere-api-key and your-weather-api-key with your actual API keys:
+**Safest one-liner:**
 
-   COHERE_API_KEY=your-cohere-api-key 
+```bash
+git clone https://github.com/Mukeshkr-19/HIKARI.git && cd HIKARI && chmod +x install.sh && ./install.sh
+```
 
-   WEATHER_API_KEY=your-weather-api-key
+### Option C — npm scripts (shortcuts)
 
-   OPENROUTER_API_KEY=your-openrouter-api-key
+After `git clone` and `cd HIKARI`:
 
-6. Run the application
+```bash
+npm install
+npm run setup
+```
 
-You can get:
+Then use:
 
-OpenRouter API Key from: https://openrouter.ai
+| Command | What it runs |
+|--------|----------------|
+| `npm run start` | Text UI (`src/hikari.py --text`) |
+| `npm run voice` | Voice UI with wake word + sleep (`--voice`) |
+| `npm run server` | WebSocket server + phone HUD (`--server`) |
+| `npm run daemon` | Always-on wake-word daemon |
+| `npm run enroll` | Speaker enrollment (`--enroll-voice`) |
 
-Cohere API Key from: https://cohere.com
+### Run `Hikari` from anywhere (terminal)
 
-OpenWeatherMap API Key from: https://openweathermap.org
+`./install.sh` symlinks `bin/Hikari` into **`~/bin`**. Add this once to `~/.zshrc` (or `~/.bashrc`) if it is not already there:
 
+```bash
+export PATH="$HOME/bin:$PATH"
+```
 
-  ## 🧠 AI Model Management
-HIKARI uses a token-aware AI model router with category-based selection:
+Restart the terminal, then from **any directory**:
 
-7 Categories: chat, coding, math, reasoning, logic, languages, other
+```bash
+Hikari
+```
 
-Each category includes ranked models from OpenRouter (e.g. DeepSeek, Mistral, Gemma, Qwen, LLaMA, etc.)
+The launcher finds your clone via the symlink (or set `HIKARI_HOME` to the repo path if you move the project).  
+In the CLI, **HUD URLs are printed** (Local + Network). Copy them, or type **`ui`** to open the HUD in your default browser. Change the port with `HIKARI_PORT` (default **8765**).
 
-If no models are available due to token limits, it falls back to Cohere automatically.
+---
 
-Usage limits are pre-configured in router.py and dynamically tracked per model.
+## Configuration (everyone uses their own keys)
 
-You can view or customize models in:
+1. Copy env template:
 
-model_registry.py — category mappings
+   ```bash
+   cp .env.example .env
+   ```
 
-router.py — usage limits & routing logic
+2. Edit `.env` and add **at least one** AI provider key (see comments in `.env.example`).
 
-   ## Usage
-After running the application, you can interact with HIKARI using voice commands. Examples:
-- "Hikari, what is the weather in New York?"
-- "Hikari, open YouTube."
-- "Hikari, open Facetime app."
-- "Hikari, tell me the time."
-- "Hikari, what is the difference between GPT and LLM?"
+**Never commit `.env`** — public collaborators must use **their** keys. Biometric enrollment files under `data/` are gitignored as well.
 
-To exit, say:
-- "Goodbye" or "Exit."
+---
+
+## How to run
+
+Activate the venv (from repo root):
+
+```bash
+source .venv/bin/activate
+```
+
+### Text mode
+
+```bash
+python src/hikari.py --text
+```
+
+### Voice mode (wake “hikari”, say “bye” to sleep, speaker-locked if enrolled)
+
+```bash
+python src/hikari.py --voice
+```
+
+### Always-on daemon (best for “always listening, only my voice”)
+
+```bash
+python src/hikari_daemon.py --enroll-voice   # once
+python src/hikari_daemon.py
+```
+
+### Start the daemon automatically at login (macOS)
+
+After enrollment, install a **Launch Agent** so you do not have to run the daemon manually each day:
+
+```bash
+chmod +x scripts/install-hikari-login-agent.sh scripts/uninstall-hikari-login-agent.sh
+./scripts/install-hikari-login-agent.sh
+```
+
+- **Only your voice** wakes HIKARI once `data/voice_auth.json` exists (same enrollment as above).
+- **Logs:** `~/Library/Logs/hikari-daemon.stdout.log` and `…stderr.log`
+- **Stop until next login:** `launchctl bootout gui/$(id -u)/com.hikari.wake`
+- **Remove auto-start:** `./scripts/uninstall-hikari-login-agent.sh`
+
+Allow **Microphone** for the app that runs the daemon (often **Terminal** during tests; after login, macOS may list **Python** under `.venv` — enable it when prompted).
+
+### Server + phone (same Wi‑Fi)
+
+```bash
+python src/hikari.py --server --port 8765
+```
+
+On your phone, open (replace with your Mac’s LAN IP shown in the terminal):
+
+- `http://<your-mac-ip>:8765/hud` — **hologram HUD**
+- `http://<your-mac-ip>:8765/connect` — compact connect UI
+- `http://<your-mac-ip>:8765/qr` — QR code
+
+Pair with the **6-digit code** printed in the terminal.
+
+**Remote use (not on same Wi‑Fi):** use [Tailscale](https://tailscale.com/) or a tunnel (e.g. Cloudflare Tunnel) so your phone can reach your Mac securely. That is outside this repo but is the standard way to get “Iron Man phone → home Mac” without exposing raw ports.
+
+---
+
+## What’s in this project (current)
+
+| Path | Role |
+|------|------|
+| `src/hikari.py` | Main entry: `--text` / `--voice` / `--server` |
+| `src/hikari_daemon.py` | Always-on wake word + speaker verification |
+| `src/hikari_cli.py` | Minimal banner CLI |
+| `core/orchestrator.py` | Agents, routing, Mac actions |
+| `core/speaker_auth.py` | Speaker embedding lock (local `data/`) |
+| `src/server.py` | WebSocket + HTTP (`/connect`, `/hud`, `/qr`) |
+| `data/` | Local state (gitignored where private) |
+| `docs/` | Extra docs + `docs/WORK_DONE.md` changelog |
+
+AI routing lives in **`core/router.py`**. Episodic turns are appended under **`data/episodes/`** (daily JSONL, local-only) in addition to `data/memory.json`.
+
+---
+
+## Learning from mistakes
+
+Say **“that’s wrong”** in the wake-word flow and the daemon will ask for a correction and save it under `data/` (see daemon + orchestrator). Teach corrections in voice or refine in text mode.
+
+---
+
+## Security note
+
+**Full “access my entire Mac”** always implies **strong trust**: keep `.env` secret, use speaker enrollment, and review Mac automation in `core/mac_integration.py` / `agents/system.py`. This README does not grant magical bypass of macOS permissions — Screen Recording, Accessibility, and Microphone must still be allowed in **System Settings** when macOS prompts you.
+
+---
+
+## License
+
+See `LICENSE` in the repository (or add one if missing — MIT is common for public projects).
+
+---
+
+## Troubleshooting
+
+### `Hikari` seems stuck, or Python errors about `site` (Conda users)
+
+If you use **Anaconda/Miniconda** with `(base)` active, Conda can set `PYTHONHOME` / `PYTHONPATH` and **break** the project’s `.venv` Python (including `import site`).
+
+**Fix:** run `conda deactivate` before `Hikari`, **or** the `bin/Hikari` launcher clears those variables and runs `python -E` — update to the latest `bin/Hikari` from this repo and re-run `./install.sh` so `~/bin/Hikari` points at it.
+
+**Do not** press **Ctrl+C** during the first ~20 seconds while models and the orchestrator load; wait until you see the HUD URLs.
+
+### `Hikari` command not found
+
+Ensure `export PATH="$HOME/bin:$PATH"` is in `~/.zshrc`, then run `./install.sh` once from your clone so `~/bin/Hikari` is created.
+
+---
+
+## More docs
+
+- [docs/README.md](docs/README.md) — feature overview  
+- [docs/QUICKSTART.md](docs/QUICKSTART.md) — quick paths  
+- [docs/WORK_DONE.md](docs/WORK_DONE.md) — technical changelog  
