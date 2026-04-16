@@ -1,17 +1,23 @@
 #!/usr/bin/env bash
-# Install a Launch Agent so HIKARI's wake-word daemon starts at login (macOS only).
-# Requires: enrollment first — only your voice activates HIKARI.
+# Install a Launch Agent so HIKARI starts at login (macOS only).
+#
+# This installs ONE background listener to avoid multiple daemons fighting over the mic.
+#
+# Default: src/hikari_simple.py (STT-based wake phrase; most reliable setup on fresh Macs).
+# If you want speaker-locked mode, run src/hikari_daemon.py manually or customize this script.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 PY="$REPO_ROOT/.venv/bin/python"
-DAEMON="$REPO_ROOT/src/hikari_daemon.py"
-PLIST_DST="$HOME/Library/LaunchAgents/com.hikari.wake.plist"
+DAEMON="$REPO_ROOT/src/hikari_simple.py"
+PLIST_DST="$HOME/Library/LaunchAgents/com.hikari.assistant.plist"
 LOG_DIR="$HOME/Library/Logs"
-OUT_LOG="$LOG_DIR/hikari-daemon.stdout.log"
-ERR_LOG="$LOG_DIR/hikari-daemon.stderr.log"
-LABEL="com.hikari.wake"
+OUT_LOG="$LOG_DIR/hikari-assistant.stdout.log"
+ERR_LOG="$LOG_DIR/hikari-assistant.stderr.log"
+LABEL="com.hikari.assistant"
+OLD_LABELS=("com.hikari.wake" "com.hikari.alwayson")
+OLD_PLISTS=("$HOME/Library/LaunchAgents/com.hikari.wake.plist" "$HOME/Library/LaunchAgents/com.hikari.alwayson.plist")
 
 if [[ "$(uname -s)" != "Darwin" ]]; then
   echo "This installer is for macOS only." >&2
@@ -28,23 +34,15 @@ if [[ ! -f "$DAEMON" ]]; then
   exit 1
 fi
 
-if [[ ! -f "$REPO_ROOT/data/voice_auth.json" ]]; then
-  echo ""
-  echo "Warning: No speaker enrollment at data/voice_auth.json"
-  echo "  For only-you mode, enroll once:"
-  echo "    cd \"$REPO_ROOT\" && .venv/bin/python src/hikari_daemon.py --enroll-voice"
-  echo ""
-  if [[ ! -t 0 ]]; then
-    echo "Non-interactive shell: enroll first, then re-run this script." >&2
-    exit 1
-  fi
-  read -r -p "Continue without enrollment? Anyone's voice may wake HIKARI. [y/N] " ans || true
-  if [[ "${ans:-}" != "y" && "${ans:-}" != "Y" ]]; then
-    exit 1
-  fi
-fi
-
 mkdir -p "$LOG_DIR"
+
+# Stop any older/competing agents (ignore errors)
+for l in "${OLD_LABELS[@]}"; do
+  launchctl bootout "gui/$(id -u)/$l" 2>/dev/null || true
+done
+for p in "${OLD_PLISTS[@]}"; do
+  launchctl unload "$p" 2>/dev/null || true
+done
 
 # Unload previous job if present (ignore errors)
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
@@ -64,7 +62,7 @@ cat >"$PLIST_DST" <<EOF
   <key>KeepAlive</key>
   <true/>
   <key>ThrottleInterval</key>
-  <integer>30</integer>
+  <integer>10</integer>
   <key>WorkingDirectory</key>
   <string>$REPO_ROOT</string>
   <key>EnvironmentVariables</key>
@@ -103,7 +101,7 @@ else
 fi
 
 echo ""
-echo "OK: HIKARI wake daemon will start at login and stay running."
+echo "OK: HIKARI will start at login and stay running."
 echo "   Repo:     $REPO_ROOT"
 echo "   Logs:     $OUT_LOG"
 echo "   Stop now:  launchctl bootout gui/$(id -u)/$LABEL"

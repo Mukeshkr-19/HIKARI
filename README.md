@@ -124,16 +124,16 @@ python src/hikari_daemon.py
 
 ### Start the daemon automatically at login (macOS)
 
-After enrollment, install a **Launch Agent** so you do not have to run the daemon manually each day:
+Install a **Launch Agent** so you do not have to run anything manually each day:
 
 ```bash
 chmod +x scripts/install-hikari-login-agent.sh scripts/uninstall-hikari-login-agent.sh
 ./scripts/install-hikari-login-agent.sh
 ```
 
-- **Only your voice** wakes HIKARI once `data/voice_auth.json` exists (same enrollment as above).
-- **Logs:** `~/Library/Logs/hikari-daemon.stdout.log` and `…stderr.log`
-- **Stop until next login:** `launchctl bootout gui/$(id -u)/com.hikari.wake`
+- **What it runs by default:** `src/hikari_simple.py` (simple always-on listener; STT-based wake phrase)
+- **Logs:** `~/Library/Logs/hikari-assistant.stdout.log` and `…stderr.log`
+- **Stop until next login:** `launchctl bootout gui/$(id -u)/com.hikari.assistant`
 - **Remove auto-start:** `./scripts/uninstall-hikari-login-agent.sh`
 
 Allow **Microphone** for the app that runs the daemon (often **Terminal** during tests; after login, macOS may list **Python** under `.venv` — enable it when prompted).
