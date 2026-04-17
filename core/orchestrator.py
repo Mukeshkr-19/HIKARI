@@ -22,6 +22,18 @@ from agents.code import CodeAgent
 from agents.memory_agent import MemoryAgent
 from core.router import AIRouter, get_router
 from core.memory import MemorySystem, get_memory
+from core.neural_memory_bridge import (
+    init_neural_memory,
+    get_memory_context,
+    remember,
+    build_memory_prompt,
+    format_whoami,
+    smart_query,
+    get_memory_stats,
+    learn_from_text,
+    end_memory_session,
+)
+from core.neural_memory import NodeType
 from core.voice import VoiceSystem
 from core.scheduler import Scheduler, setup_default_scheduler
 from core.voice_memory import VoiceMemory
@@ -97,6 +109,10 @@ class Orchestrator:
         self.planner = get_task_planner()
         self.build_executor = get_build_executor()
 
+        # Neural memory system
+        self.neural_memory_enabled = True
+        init_neural_memory()
+
         self._init_agents()
         self._init_intelligence()
         self._init_scheduler()
@@ -141,7 +157,9 @@ class Orchestrator:
             register_builtin_skills(self.skill_registry)
             register_memory_skills(self.skill_registry)
             if not is_quiet():
-                print(f"[ORCHESTRATOR] Registered {len(self.skill_registry.skills)} skills")
+                print(
+                    f"[ORCHESTRATOR] Registered {len(self.skill_registry.skills)} skills"
+                )
         except Exception as e:
             print(f"[ORCHESTRATOR] Skills init failed: {e}")
 
@@ -247,11 +265,19 @@ class Orchestrator:
             for w in [
                 "who am i",
                 "what do you know about me",
-                "what do you remember",
                 "tell me about myself",
             ]
         ):
             return self._get_user_summary()
+
+        # Neural memory "what do you remember" query
+        if "what do you remember" in lowered or "recall" in lowered:
+            return format_whoami()
+
+        # Memory stats
+        if "memory stats" in lowered or "memory status" in lowered:
+            stats = get_memory_stats()
+            return f"Neural Memory: {stats.get('nodes', 0)} nodes, {stats.get('edges', 0)} edges, {stats.get('episodes', 0)} episodes"
 
         # Check for "how am i doing" or "how have i been"
         if any(
@@ -300,9 +326,7 @@ class Orchestrator:
 
         profile_answer = self._try_answer_from_stored_profile(lowered)
         if profile_answer:
-            self.memory.add_conversation(
-                lowered, profile_answer, source=source
-            )
+            self.memory.add_conversation(lowered, profile_answer, source=source)
             self.semantic_memory.add_conversation(
                 lowered, profile_answer, metadata={"source": source}
             )
@@ -312,6 +336,10 @@ class Orchestrator:
 
         # Extract knowledge from conversation
         self.knowledge_graph.extract_from_conversation(lowered, "")
+
+        # Neural memory: learn entities from conversation
+        if self.neural_memory_enabled:
+            learn_from_text(lowered)
 
         # Check health state (recovery already returned early from detect_health_state)
         health_state = self.health.detect_health_state(lowered)
@@ -336,14 +364,16 @@ class Orchestrator:
         skill = self.skill_registry.find_best_skill(user_input)
         if skill:
             # Execute skill with full context
-            if hasattr(skill, 'execute'):
+            if hasattr(skill, "execute"):
                 try:
                     # Map skill names to actions
                     skill_name = skill.name
                     if skill_name == "memory":
                         result = skill.execute(
-                            action="recall" if "what" in lowered or "remember" not in lowered else "store",
-                            query=user_input
+                            action="recall"
+                            if "what" in lowered or "remember" not in lowered
+                            else "store",
+                            query=user_input,
                         )
                     elif skill_name == "notes":
                         result = skill.execute(action="list")
@@ -351,11 +381,13 @@ class Orchestrator:
                         result = skill.execute(action="track", user_input=user_input)
                     else:
                         result = skill.execute(user_input=user_input)
-                    
+
                     if result:
                         self.memory.add_conversation(lowered, result, source=source)
                         self.semantic_memory.add_conversation(
-                            lowered, result, metadata={"source": source, "skill": skill_name}
+                            lowered,
+                            result,
+                            metadata={"source": source, "skill": skill_name},
                         )
                         if not is_quiet():
                             print(f"[SKILL {skill_name}]: {result}")
@@ -377,6 +409,9 @@ class Orchestrator:
             self.semantic_memory.add_conversation(
                 lowered, response, metadata={"source": source}
             )
+            # Neural memory storage
+            if self.neural_memory_enabled:
+                remember(lowered, response, {"source": source, "user": "sanjay"})
             if not is_quiet():
                 print(f"\n[OUTPUT]: {response}")
 
@@ -409,8 +444,15 @@ class Orchestrator:
     def _get_ai_response(
         self, user_input: str, emotion: str = "neutral", emotion_score: float = 0.0
     ) -> Optional[str]:
-        """Get response from AI router with emotional intelligence and user context"""
+        """Get response from AI router with emotional intelligence and neural memory context"""
         context = self.memory.get_context_for_prompt(limit=5)
+
+        # Add neural memory context
+        if self.neural_memory_enabled:
+            neural_ctx = build_memory_prompt(user_input)
+            if neural_ctx:
+                context = f"{context}\n{neural_ctx}" if context else neural_ctx
+
         system_prompt = self._build_system_prompt(emotion, emotion_score)
 
         response = self.router.generate(
@@ -681,6 +723,16 @@ Address {who} by name when you know it; if you only know them as "friend", don't
         parts.append(
             f"\nMemory: {len(self.memory.conversations)} conversations, {len(self.memory.facts)} facts"
         )
+
+        # Neural Memory
+        if self.neural_memory_enabled:
+            try:
+                nm_stats = get_memory_stats()
+                parts.append(
+                    f"Neural Memory: {nm_stats.get('nodes', 0)} nodes, {nm_stats.get('edges', 0)} edges"
+                )
+            except:
+                pass
 
         # Connected devices
         parts.append(f"\nConnected devices: {len(self.connected_devices)}")

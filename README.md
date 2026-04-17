@@ -164,12 +164,15 @@ Pair with the **6-digit code** printed in the terminal.
 | `src/hikari_daemon.py` | Always-on wake word + speaker verification |
 | `src/hikari_cli.py` | Minimal banner CLI |
 | `core/orchestrator.py` | Agents, routing, Mac actions |
+| `core/neural_memory/` | Optional SQLite graph memory (private DB under `~/.hikari/brain/`) |
 | `core/speaker_auth.py` | Speaker embedding lock (local `data/`) |
 | `src/server.py` | WebSocket + HTTP (`/connect`, `/hud`, `/qr`) |
 | `data/` | Local state (gitignored where private) |
 | `docs/` | Extra docs + `docs/WORK_DONE.md` changelog |
 
 AI routing lives in **`core/router.py`**. Episodic turns are appended under **`data/episodes/`** (daily JSONL, local-only) in addition to `data/memory.json`.
+
+Neural graph memory (if enabled in the orchestrator) keeps its database under **`~/.hikari/brain/`** (never committed). Optional seed file: **`~/.hikari/brain/seed_nodes.json`** (see `MemoryCompiler.seed_initial_data` — no personal data is shipped in-repo).
 
 ---
 
