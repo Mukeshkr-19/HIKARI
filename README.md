@@ -172,7 +172,7 @@ Pair with the **6-digit code** printed in the terminal.
 
 AI routing lives in **`core/router.py`**. Episodic turns are appended under **`data/episodes/`** (daily JSONL, local-only) in addition to `data/memory.json`.
 
-Neural graph memory (if enabled in the orchestrator) keeps its database under **`~/.hikari/brain/`** (never committed). Optional seed file: **`~/.hikari/brain/seed_nodes.json`** (see `MemoryCompiler.seed_initial_data` — no personal data is shipped in-repo).
+Neural graph memory (if enabled in the orchestrator) keeps its database under **`~/.hikari/brain/`** (never committed). Optional seed file: **`~/.hikari/brain/seed_nodes.json`** (see `MemoryCompiler.seed_initial_data` — no personal data is shipped in-repo). **Pass/fail standard for memory work:** `docs/NEURAL_MEMORY_ACCEPTANCE.md`.
 
 ---
 
