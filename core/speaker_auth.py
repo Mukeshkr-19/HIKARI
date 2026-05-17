@@ -196,4 +196,3 @@ class SpeakerAuth:
             "embedding": self._enrolled_embedding,
         }
         VOICE_AUTH_FILE.write_text(json.dumps(payload), encoding="utf-8")
-

@@ -1,217 +1,199 @@
-# HIKARI
+# HIKARI v2.0 - Personal AI Assistant
 
-**Local-first “JARVIS-style” assistant for macOS** — wake word, speaker lock, multi-agent brain, Mac automation, learning from corrections, and a phone HUD that talks to your Mac.
+> A multi-agent autonomous AI assistant with voice authentication, cross-device connectivity, and multi-provider AI routing.
 
-Everything you need lives **inside this repository** after you clone it (virtualenv, `data/`, `.env`). No hardcoded machine paths.
+## Features
 
----
+- **Multi-Agent Swarm** - 6 specialized agents (Voice, Research, Files, System, Code, Memory) working autonomously
+- **Multi-Provider AI Routing** - Smart routing across Google, Groq, OpenRouter, Cerebras, DeepSeek, NVIDIA, Cohere
+- **Voice Authentication** - Voice print + codename fallback (`harsha27`) + clap detection
+- **Cross-Device** - Laptop as brain, phone/watch as interface via WebSocket + QR pairing
+- **File System Access** - Secure, whitelisted file reading and searching
+- **World Awareness** - Real-time news, weather, time, proactive alerts
+- **Memory & Learning** - Persistent conversation history, user preferences, fact learning
+- **Security First** - Encrypted API keys, file access policies, audit logging
 
-## Requirements
+## Quick Start
 
-- **macOS** (primary target; voice + `say` TTS + AppleScript automation)
-- **Python 3.10+** (3.12 recommended)
-- **Node.js 18+** (optional — only if you use `npm run …` shortcuts)
-
----
-
-## Install (any Mac — portable)
-
-### Option A — `git clone` + install script (recommended)
-
-```bash
-git clone https://github.com/Mukeshkr-19/HIKARI.git
-cd HIKARI
-chmod +x install.sh
-./install.sh
-```
-
-This creates `.venv` in the repo, installs Python dependencies, and copies `.env.example` → `.env` if `.env` is missing.
-
-### Option B — One-liner (downloads `install.sh` from GitHub)
-
-Replace `main` with your branch if needed:
+### 1. Install Dependencies
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Mukeshkr-19/HIKARI/main/install.sh | bash
-```
-
-Then `cd` into the folder you cloned (the script is meant to be run **inside** the repo after clone; the canonical flow is still **clone first**, then `./install.sh` from the repo root).
-
-**Safest one-liner:**
-
-```bash
-git clone https://github.com/Mukeshkr-19/HIKARI.git && cd HIKARI && chmod +x install.sh && ./install.sh
-```
-
-### Option C — npm scripts (shortcuts)
-
-After `git clone` and `cd HIKARI`:
-
-```bash
-npm install
-npm run setup
-```
-
-Then use:
-
-| Command | What it runs |
-|--------|----------------|
-| `npm run start` | Text UI (`src/hikari.py --text`) |
-| `npm run voice` | Voice UI with wake word + sleep (`--voice`) |
-| `npm run server` | WebSocket server + phone HUD (`--server`) |
-| `npm run daemon` | Always-on wake-word daemon |
-| `npm run enroll` | Speaker enrollment (`--enroll-voice`) |
-
-### Run `Hikari` from anywhere (terminal)
-
-`./install.sh` symlinks `bin/Hikari` into **`~/bin`**. Add this once to `~/.zshrc` (or `~/.bashrc`) if it is not already there:
-
-```bash
-export PATH="$HOME/bin:$PATH"
-```
-
-Restart the terminal, then from **any directory**:
-
-```bash
-Hikari
-```
-
-The launcher finds your clone via the symlink (or set `HIKARI_HOME` to the repo path if you move the project).  
-In the CLI, **HUD URLs are printed** (Local + Network). Copy them, or type **`ui`** to open the HUD in your default browser. Change the port with `HIKARI_PORT` (default **8765**).
-
----
-
-## Configuration (everyone uses their own keys)
-
-1. Copy env template:
-
-   ```bash
-   cp .env.example .env
-   ```
-
-2. Edit `.env` and add **at least one** AI provider key (see comments in `.env.example`).
-
-**Never commit `.env`** — public collaborators must use **their** keys. Biometric enrollment files under `data/` are gitignored as well.
-
----
-
-## How to run
-
-Activate the venv (from repo root):
-
-```bash
+cd ~/PycharmProjects/HIKARI
+python3 -m venv .venv
 source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
-### Text mode
+### 2. Set Up API Keys
 
 ```bash
-python src/hikari.py --text
+cp .env.example .env
+# Edit .env and add your API keys (at least ONE AI provider required)
 ```
 
-### Voice mode (wake “hikari”, say “bye” to sleep, speaker-locked if enrolled)
+**Recommended minimum setup:**
+- `GOOGLE_AI_STUDIO_KEY` - Best free tier (1M context window)
+- `GROQ_API_KEY` - Fastest inference (300+ tokens/sec)
+
+**Get free API keys:**
+- Google AI Studio: https://aistudio.google.com
+- Groq: https://console.groq.com
+- OpenRouter: https://openrouter.ai
+- Cerebras: https://cloud.cerebras.ai
+- DeepSeek: https://platform.deepseek.com
+- NVIDIA: https://build.nvidia.com
+
+### 3. Run HIKARI
 
 ```bash
-python src/hikari.py --voice
+# Voice mode (default)
+python3 hikari.py
+
+# Text mode
+python3 hikari.py --text
+
+# Server only (for phone connections)
+python3 hikari.py --server
+
+# Custom port
+python3 hikari.py --port 9000
 ```
 
-### Always-on daemon (best for “always listening, only my voice”)
+## Connecting Your Phone
 
-```bash
-python src/hikari_daemon.py --enroll-voice   # once
-python src/hikari_daemon.py
+1. Start HIKARI on your laptop
+2. Note the IP address and port shown in the terminal
+3. On your phone, open: `http://<your-laptop-ip>:8765/connect`
+4. Or scan the QR code: `http://<your-laptop-ip>:8765/qr`
+5. Enter the 6-digit pairing code shown on your laptop
+
+**Same WiFi network required.** Your laptop is the brain - phone is just an interface.
+
+## Voice Activation
+
+- **Wake Word**: Say "Hikari" to activate
+- **Codename**: Say "harsha27" for fallback authentication
+- **Clap Detection**: Double-clap to activate (when enabled)
+- **Voice Print**: Train your voice for biometric auth (optional)
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| "What's the weather in [city]?" | Get weather info |
+| "Open [app]" | Launch an application |
+| "Open [website]" | Open a website |
+| "What time is it?" | Current time |
+| "What's the news?" | Latest headlines |
+| "Morning briefing" | Full daily briefing |
+| "Read my [file]" | Read a file (whitelisted dirs) |
+| "Search for [query]" | Search files or web |
+| "Remember that [fact]" | Store a fact |
+| "What do you know about me?" | View stored memories |
+| "Status" | System status report |
+| "Exit" / "Goodbye" | Shut down |
+
+## Architecture
+
+```
+hikari/
+├── core/                    # Core systems
+│   ├── orchestrator.py      # Agent swarm manager
+│   ├── router.py            # Multi-provider AI routing
+│   ├── voice.py             # Speech I/O, wake word, clap detection
+│   └── memory.py            # Persistent memory system
+├── agents/                  # Autonomous agents
+│   ├── base.py              # Base agent class
+│   ├── voice.py             # Voice authentication & I/O
+│   ├── research.py          # Web search, news, weather
+│   ├── files.py             # Secure file system access
+│   ├── system.py            # Apps, websites, system info
+│   ├── code.py              # Programming assistance
+│   └── memory_agent.py      # Memory & personalization
+├── security/                # Security layer
+│   └── auth.py              # Voice print, codename, policies
+├── skills/                  # Extensible skills
+├── config/                  # Configuration files
+├── data/                    # Runtime data (memory, voice prints)
+├── hikari-frontend/         # Next.js PWA (optional)
+├── server.py                # WebSocket + HTTP server
+├── hikari.py                # Main entry point
+├── requirements.txt         # Python dependencies
+└── .env.example             # Environment template
 ```
 
-### Start the daemon automatically at login (macOS)
+## AI Provider Routing
 
-Install a **Launch Agent** so you do not have to run anything manually each day:
+HIKARI intelligently routes requests based on task type:
 
-```bash
-chmod +x scripts/install-hikari-login-agent.sh scripts/uninstall-hikari-login-agent.sh
-./scripts/install-hikari-login-agent.sh
+| Task Type | Provider | Model |
+|-----------|----------|-------|
+| Quick answers | Groq | Llama 3.3 70B |
+| General chat | Google | Gemini 2.0 Flash |
+| Deep reasoning | Google | Gemini 2.5 Pro |
+| Coding | Groq | Qwen3 32B |
+| Math | DeepSeek | DeepSeek Reasoner |
+| Fallback | Cohere | Command R+ |
+
+If a provider fails, HIKARI automatically falls back through the chain.
+
+## Security
+
+- All API keys stored in `.env` (never in code)
+- File access restricted to whitelisted directories
+- Voice prints stored locally, never sent to servers
+- Codename hashed with SHA-256
+- Agent action audit logging
+- Pairing code for device connections
+
+## Customization
+
+### Add a new agent
+
+```python
+# agents/my_agent.py
+from agents.base import BaseAgent
+
+class MyAgent(BaseAgent):
+    def __init__(self):
+        super().__init__("my_agent", "Description")
+
+    def handle(self, user_input: str, context: str = "") -> str:
+        # Your logic here
+        return "Response"
+
+    def can_handle(self, user_input: str) -> float:
+        # Return 0-1 confidence
+        return 0.5
 ```
 
-- **What it runs by default:** `src/hikari_simple.py` (simple always-on listener; STT-based wake phrase)
-- **Logs:** `~/Library/Logs/hikari-assistant.stdout.log` and `…stderr.log`
-- **Stop until next login:** `launchctl bootout gui/$(id -u)/com.hikari.assistant`
-- **Remove auto-start:** `./scripts/uninstall-hikari-login-agent.sh`
-
-Allow **Microphone** for the app that runs the daemon (often **Terminal** during tests; after login, macOS may list **Python** under `.venv` — enable it when prompted).
-
-### Server + phone (same Wi‑Fi)
-
-```bash
-python src/hikari.py --server --port 8765
+Then register in `core/orchestrator.py`:
+```python
+self.agents["my_agent"] = MyAgent()
 ```
 
-On your phone, open (replace with your Mac’s LAN IP shown in the terminal):
+### Add a new AI provider
 
-- `http://<your-mac-ip>:8765/hud` — **hologram HUD**
-- `http://<your-mac-ip>:8765/connect` — compact connect UI
-- `http://<your-mac-ip>:8765/qr` — QR code
-
-Pair with the **6-digit code** printed in the terminal.
-
-**Remote use (not on same Wi‑Fi):** use [Tailscale](https://tailscale.com/) or a tunnel (e.g. Cloudflare Tunnel) so your phone can reach your Mac securely. That is outside this repo but is the standard way to get “Iron Man phone → home Mac” without exposing raw ports.
-
----
-
-## What’s in this project (current)
-
-| Path | Role |
-|------|------|
-| `src/hikari.py` | Main entry: `--text` / `--voice` / `--server` |
-| `src/hikari_daemon.py` | Always-on wake word + speaker verification |
-| `src/hikari_cli.py` | Minimal banner CLI |
-| `core/orchestrator.py` | Agents, routing, Mac actions |
-| `core/neural_memory/` | Optional SQLite graph memory (private DB under `~/.hikari/brain/`) |
-| `core/speaker_auth.py` | Speaker embedding lock (local `data/`) |
-| `src/server.py` | WebSocket + HTTP (`/connect`, `/hud`, `/qr`) |
-| `data/` | Local state (gitignored where private) |
-| `docs/` | Extra docs + `docs/WORK_DONE.md` changelog |
-
-AI routing lives in **`core/router.py`**. Episodic turns are appended under **`data/episodes/`** (daily JSONL, local-only) in addition to `data/memory.json`.
-
-Neural graph memory (if enabled in the orchestrator) keeps its database under **`~/.hikari/brain/`** (never committed). Optional seed file: **`~/.hikari/brain/seed_nodes.json`** (see `MemoryCompiler.seed_initial_data` — no personal data is shipped in-repo). **Pass/fail standard for memory work:** `docs/NEURAL_MEMORY_ACCEPTANCE.md`.
-
----
-
-## Learning from mistakes
-
-Say **“that’s wrong”** in the wake-word flow and the daemon will ask for a correction and save it under `data/` (see daemon + orchestrator). Teach corrections in voice or refine in text mode.
-
----
-
-## Security note
-
-**Full “access my entire Mac”** always implies **strong trust**: keep `.env` secret, use speaker enrollment, and review Mac automation in `core/mac_integration.py` / `agents/system.py`. This README does not grant magical bypass of macOS permissions — Screen Recording, Accessibility, and Microphone must still be allowed in **System Settings** when macOS prompts you.
-
----
-
-## License
-
-See `LICENSE` in the repository (or add one if missing — MIT is common for public projects).
-
----
+Edit `core/router.py` and add to `PROVIDER_CONFIGS`.
 
 ## Troubleshooting
 
-### `Hikari` seems stuck, or Python errors about `site` (Conda users)
+**No audio input:**
+```bash
+# macOS: Check microphone permissions in System Preferences > Security > Microphone
+# Install PyAudio: brew install portaudio && pip install pyaudio
+```
 
-If you use **Anaconda/Miniconda** with `(base)` active, Conda can set `PYTHONHOME` / `PYTHONPATH` and **break** the project’s `.venv` Python (including `import site`).
+**WebSocket connection fails:**
+- Ensure laptop and phone are on the same WiFi
+- Check firewall settings allow port 8765
+- Use `ifconfig` to find your laptop's IP address
 
-**Fix:** run `conda deactivate` before `Hikari`, **or** the `bin/Hikari` launcher clears those variables and runs `python -E` — update to the latest `bin/Hikari` from this repo and re-run `./install.sh` so `~/bin/Hikari` points at it.
+**AI responses fail:**
+- Check that at least one API key is set in `.env`
+- Run `python3 hikari.py --text` to see detailed error logs
+- Check provider status with "status" command
 
-**Do not** press **Ctrl+C** during the first ~20 seconds while models and the orchestrator load; wait until you see the HUD URLs.
+## License
 
-### `Hikari` command not found
-
-Ensure `export PATH="$HOME/bin:$PATH"` is in `~/.zshrc`, then run `./install.sh` once from your clone so `~/bin/Hikari` is created.
-
----
-
-## More docs
-
-- [docs/README.md](docs/README.md) — feature overview  
-- [docs/QUICKSTART.md](docs/QUICKSTART.md) — quick paths  
-- [docs/WORK_DONE.md](docs/WORK_DONE.md) — technical changelog  
+MIT - Build something amazing.

@@ -16,8 +16,6 @@ from datetime import datetime
 from pathlib import Path
 import numpy as np
 
-from core.quiet import is_quiet
-
 DATA_DIR = Path(__file__).parent.parent / "data"
 VOICE_DIR = DATA_DIR / "voice_memory"
 VOICE_PROFILES_FILE = VOICE_DIR / "profiles.json"
@@ -343,8 +341,7 @@ class VoiceMemory:
                 recent_avg = np.mean(self.voice_quality_history[-5:])
                 if recent_avg < self.sick_threshold:
                     self.is_sick_mode = True
-                    if not is_quiet():
-                        print(f"[VOICE_MEMORY] Sick mode activated for {user_id}")
+                    print(f"[VOICE_MEMORY] Sick mode activated for {user_id}")
 
         # Gradually adapt the profile
         learning_rate = 0.05  # Slow adaptation
@@ -449,8 +446,7 @@ class VoiceMemory:
         """Reset sick mode when user recovers"""
         self.is_sick_mode = False
         self.voice_quality_history = []
-        if not is_quiet():
-            print("[VOICE_MEMORY] Sick mode deactivated")
+        print("[VOICE_MEMORY] Sick mode deactivated")
         self._save()
 
     def get_all_users(self) -> List[str]:

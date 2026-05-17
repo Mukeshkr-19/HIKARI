@@ -150,11 +150,11 @@ Use this row to update when the codebase changes.
 
 A memory PR **must not merge** if it:
 
-1. Adds or widens model prompt injection without bounded context (P1, P4).  
-2. Adds new persistence paths for important memory without provenance (T1–T4).  
-3. Uses overwrite for factual/preference memory where supersede is required by this doc (T2, S1) once those features are in scope for that subsystem.  
-4. Adds multi-step DB writes without transactions (D1).  
-5. Weakens extraction filters without test evidence (Q3).  
+1. Adds or widens model prompt injection without bounded context (P1, P4).
+2. Adds new persistence paths for important memory without provenance (T1–T4).
+3. Uses overwrite for factual/preference memory where supersede is required by this doc (T2, S1) once those features are in scope for that subsystem.
+4. Adds multi-step DB writes without transactions (D1).
+5. Weakens extraction filters without test evidence (Q3).
 
 ---
 

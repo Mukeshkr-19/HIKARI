@@ -46,7 +46,7 @@ tell application "Calendar"
     set eventList to {}
     set todayDate to current date
     set endDate to todayDate + 1 * days
-    
+
     repeat with cal in calendars
         try
             tell cal

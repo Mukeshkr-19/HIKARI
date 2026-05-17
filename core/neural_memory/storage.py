@@ -193,7 +193,7 @@ class MemoryStorage:
     def get_edges_for_node(self, node_id: int, user_id: str = None) -> List[MemoryEdge]:
         user_id = user_id or config.user_id
         rows = self.fetch_all(
-            """SELECT * FROM edges WHERE 
+            """SELECT * FROM edges WHERE
                (source_id = ? OR target_id = ?) AND user_id = ? AND is_archived = 0
                ORDER BY weight DESC""",
             (node_id, node_id, user_id),
@@ -366,7 +366,7 @@ class MemoryStorage:
         with self.get_connection() as conn:
             cursor = conn.execute(
                 """UPDATE nodes SET is_archived = 1, updated_at = datetime('now')
-                   WHERE is_archived = 0 AND salience < ? 
+                   WHERE is_archived = 0 AND salience < ?
                    AND datetime(last_accessed) < datetime('now', ?)""",
                 (min_salience, f"-{days} days"),
             )

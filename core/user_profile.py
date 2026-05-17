@@ -12,75 +12,10 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from collections import defaultdict, Counter
 
-
-def _fact_entry_text(entry: Any) -> str:
-    """Facts may be legacy plain strings or dicts with a 'fact' key."""
-    if isinstance(entry, dict):
-        return str(entry.get("fact") or "").strip()
-    return str(entry or "").strip()
-
-
-_STATE_AFTER_IM = frozenset(
-    {
-        "fine",
-        "good",
-        "ok",
-        "okay",
-        "well",
-        "doing",
-        "feeling",
-        "back",
-        "here",
-        "sorry",
-        "busy",
-        "tired",
-        "sick",
-        "done",
-        "ready",
-        "not",
-        "just",
-        "still",
-        "afraid",
-        "glad",
-        "happy",
-        "sad",
-        "trying",
-        "looking",
-    }
-)
-
-_ONBOARDING_CHITCHAT = frozenset(
-    {
-        "hi",
-        "hey",
-        "hello",
-        "yo",
-        "hiya",
-        "sup",
-        "thanks",
-        "thank",
-        "you",
-        "yes",
-        "no",
-        "bye",
-        "ok",
-        "okay",
-    }
-)
-
-def _resolve_data_dir() -> Path:
-    env = os.environ.get("HIKARI_DATA_DIR", "").strip()
-    if env:
-        return Path(env).expanduser().resolve()
-    return (Path(__file__).resolve().parent.parent / "data").resolve()
-
-
-DATA_DIR = _resolve_data_dir()
+DATA_DIR = Path(__file__).parent.parent / "data"
 PROFILE_FILE = DATA_DIR / "user_profile.json"
 PATTERNS_FILE = DATA_DIR / "behavior_patterns.json"
 RELATIONSHIPS_FILE = DATA_DIR / "relationships.json"
-PREFERENCES_FILE = DATA_DIR / "preferences.json"
-MEMORY_FILE = DATA_DIR / "memory.json"
 
 
 class UserProfile:
@@ -94,55 +29,12 @@ class UserProfile:
         self.daily_log: List[Dict] = []
         self._load()
 
-    def _merge_name_from_peer_files(self) -> bool:
-        """Recover name from preferences.json / memory.json so onboarding does not repeat after restart."""
-        n = self.profile.get("name")
-        if n and str(n).strip() and str(n).strip() != "user":
-            return False
-
-        try:
-            if PREFERENCES_FILE.exists():
-                with open(PREFERENCES_FILE, "r") as f:
-                    prefs = json.load(f)
-                nm = prefs.get("name")
-                if nm and str(nm).strip():
-                    self.profile["name"] = str(nm).strip()
-                    self.profile["onboarding_complete"] = True
-                    return True
-        except Exception:
-            pass
-
-        try:
-            if MEMORY_FILE.exists():
-                with open(MEMORY_FILE, "r") as f:
-                    data = json.load(f)
-                facts = data.get("facts") or {}
-                for key in ("preferred_name", "name"):
-                    entry = facts.get(key)
-                    if isinstance(entry, dict):
-                        val = entry.get("value")
-                    else:
-                        val = entry
-                    if val and str(val).strip():
-                        self.profile["name"] = str(val).strip()
-                        self.profile["onboarding_complete"] = True
-                        return True
-        except Exception:
-            pass
-        return False
-
     def _load(self):
         """Load all profile data"""
-        need_save = False
         try:
             if PROFILE_FILE.exists():
                 with open(PROFILE_FILE, "r") as f:
                     self.profile = json.load(f)
-                n = self.profile.get("name")
-                if n and str(n).strip() and str(n).strip() != "user":
-                    if not self.profile.get("onboarding_complete"):
-                        self.profile["onboarding_complete"] = True
-                        need_save = True
         except Exception as e:
             print(f"[PROFILE] Load error: {e}")
 
@@ -160,11 +52,6 @@ class UserProfile:
         except Exception as e:
             print(f"[PROFILE] Relationships load error: {e}")
 
-        if self._merge_name_from_peer_files():
-            need_save = True
-        if need_save:
-            self._save()
-
     def _save(self):
         """Save all profile data"""
         try:
@@ -181,71 +68,11 @@ class UserProfile:
 
     def set_name(self, name: str):
         """Set user's name"""
-        name = (name or "").strip()
-        if not name:
-            return
         self.profile["name"] = name
-        self.profile["onboarding_complete"] = True
         self._save()
 
     def get_name(self) -> str:
         return self.profile.get("name", "user")
-
-    def needs_onboarding(self) -> bool:
-        """True only until we have a real name on disk (survives restarts via user_profile + synced stores)."""
-        n = self.profile.get("name")
-        if n and str(n).strip() and str(n).strip() != "user":
-            return False
-        if self.profile.get("onboarding_complete"):
-            return False
-        return True
-
-    def mark_onboarding_complete(self):
-        self.profile["onboarding_complete"] = True
-        self._save()
-
-    def get_display_name(self) -> str:
-        """Name for prompts; neutral until the user introduces themselves."""
-        n = self.profile.get("name")
-        if n and n != "user":
-            return n
-        return "friend"
-
-    def parse_intro_name_line(self, text: str) -> Optional[str]:
-        """Parse a first-line name answer during onboarding; returns None if not a plausible name."""
-        raw = (text or "").strip()
-        if not raw:
-            return None
-        raw = raw.split("\n")[0]
-        lower = raw.lower().strip()
-
-        if lower in _ONBOARDING_CHITCHAT:
-            return None
-        tok0 = lower.split()[0].rstrip(".,!?")
-        if tok0 in _ONBOARDING_CHITCHAT:
-            return None
-
-        if lower.startswith("my name is "):
-            raw = raw[11:].strip()
-        elif lower.startswith("call me "):
-            raw = raw[8:].strip()
-        elif lower.startswith("i am "):
-            raw = raw[5:].strip()
-        else:
-            m = re.match(r"^(i'?m|im)\s+(.+)$", lower, re.I)
-            if m:
-                rest = m.group(2).strip()
-                first = rest.split()[0].rstrip(".,!?") if rest else ""
-                if first in _STATE_AFTER_IM:
-                    return None
-                raw = rest
-
-        raw = raw.strip().strip(".,!? ")
-        if not raw or len(raw) > 60:
-            return None
-        if not re.match(r"^[\w\s'.-]+$", raw, re.UNICODE):
-            return None
-        return raw
 
     def set_timezone(self, tz: str):
         self.profile["timezone"] = tz
@@ -317,12 +144,8 @@ class UserProfile:
             self.profile["facts"][category] = []
 
         # Check if fact already exists
-        fl = fact.lower()
         for existing in self.profile["facts"][category]:
-            ex = _fact_entry_text(existing).lower()
-            if not ex:
-                continue
-            if fl in ex or ex in fl:
+            if fact.lower() in existing.lower() or existing.lower() in fact.lower():
                 return  # Already known
 
         self.profile["facts"][category].append(
@@ -338,17 +161,10 @@ class UserProfile:
         """Get learned facts"""
         facts = self.profile.get("facts", {})
         if category:
-            return [
-                t
-                for f in facts.get(category, [])
-                if (t := _fact_entry_text(f))
-            ]
+            return [f["fact"] for f in facts.get(category, [])]
         all_facts = []
         for cat_facts in facts.values():
-            for f in cat_facts:
-                t = _fact_entry_text(f)
-                if t:
-                    all_facts.append(t)
+            all_facts.extend([f["fact"] for f in cat_facts])
         return all_facts
 
     # --- Relationships ---
@@ -513,17 +329,6 @@ class UserProfile:
 
     def extract_info_from_conversation(self, user_input: str, ai_response: str):
         """Automatically extract information from conversations"""
-        stripped = user_input.strip()
-        m = re.match(r"^my name is\s+(.+)$", stripped, re.I)
-        if m:
-            cand = m.group(1).strip().rstrip(".,!?")
-            if (
-                cand
-                and len(cand) <= 80
-                and re.match(r"^[\w\s'.-]+$", cand, re.UNICODE)
-            ):
-                self.set_name(cand)
-
         lower = user_input.lower()
 
         # Extract names and relationships
@@ -615,37 +420,22 @@ class UserProfile:
             if pref_strs:
                 parts.append(f"Preferences: {', '.join(pref_strs[:10])}")
 
-        # Add facts (include all; cap length so prompts stay bounded)
+        # Add facts
         facts = self.get_facts()
         if facts:
-            joined = "; ".join(facts)
-            if len(joined) > 4000:
-                joined = joined[:4000] + "…"
-            parts.append(f"Known facts ({len(facts)} items): {joined}")
+            parts.append(f"Known facts: {'; '.join(facts[:5])}")
 
-        # Add relationships (include details — e.g. where someone lives)
+        # Add relationships
         relationships = self.get_relationships()
         if relationships:
-            rel_strs = []
-            for r in relationships[:15]:
-                name = r.get("name") or ""
-                rel = r.get("relationship") or ""
-                det = r.get("details") or {}
-                s = f"{name} ({rel})" if name else f"({rel})"
-                if det:
-                    s += f" — {det}"
-                rel_strs.append(s)
-            parts.append(f"People: {'; '.join(rel_strs)}")
+            rel_strs = [f"{r['name']} ({r['relationship']})" for r in relationships[:5]]
+            parts.append(f"People: {', '.join(rel_strs)}")
 
         # Add mood
         mood = self.get_current_mood()
         if mood:
             parts.append(f"Current mood: {mood}")
 
-        parts.insert(
-            0,
-            "USER PROFILE (stored locally on the user's machine — authoritative for personal questions):",
-        )
         return "\n".join(parts)
 
     def get_summary(self) -> Dict[str, Any]:

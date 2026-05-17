@@ -11,18 +11,9 @@ from typing import Optional, Dict, List, Any
 from datetime import datetime
 from pathlib import Path
 
-
-def _resolve_data_dir() -> Path:
-    env = os.environ.get("HIKARI_DATA_DIR", "").strip()
-    if env:
-        return Path(env).expanduser().resolve()
-    return (Path(__file__).resolve().parent.parent / "data").resolve()
-
-
-DATA_DIR = _resolve_data_dir()
+DATA_DIR = Path(__file__).parent.parent / "data"
 MEMORY_FILE = DATA_DIR / "memory.json"
 PREFERENCES_FILE = DATA_DIR / "preferences.json"
-EPISODES_DIR = DATA_DIR / "episodes"
 
 
 class MemorySystem:
@@ -30,7 +21,6 @@ class MemorySystem:
 
     def __init__(self):
         DATA_DIR.mkdir(exist_ok=True)
-        EPISODES_DIR.mkdir(parents=True, exist_ok=True)
         self.conversations: List[Dict] = []
         self.preferences: Dict[str, Any] = {}
         self.facts: Dict[str, Any] = {}
@@ -70,15 +60,8 @@ class MemorySystem:
         except Exception as e:
             print(f"[MEMORY] Save error: {e}")
 
-    def add_conversation(
-        self,
-        user_input: str,
-        ai_response: str,
-        context: str = "",
-        *,
-        source: str = "text",
-    ):
-        """Add a conversation turn; also append a local JSONL episode (Omi-style daily file)."""
+    def add_conversation(self, user_input: str, ai_response: str, context: str = ""):
+        """Add a conversation turn"""
         entry = {
             "timestamp": datetime.now().isoformat(),
             "user": user_input,
@@ -89,23 +72,6 @@ class MemorySystem:
         }
         self.conversations.append(entry)
         self._save()
-        self._append_episode_jsonl(user_input, ai_response, source=source)
-
-    def _append_episode_jsonl(self, user_input: str, ai_response: str, *, source: str):
-        """One JSON object per line under data/episodes/YYYY-MM-DD.jsonl (local, private)."""
-        try:
-            day = datetime.now().strftime("%Y-%m-%d")
-            path = EPISODES_DIR / f"{day}.jsonl"
-            row = {
-                "ts": datetime.now().isoformat(),
-                "source": source,
-                "user": user_input,
-                "ai": ai_response,
-            }
-            with open(path, "a", encoding="utf-8") as f:
-                f.write(json.dumps(row, ensure_ascii=False) + "\n")
-        except Exception as e:
-            print(f"[MEMORY] Episode log error: {e}")
 
     def get_recent_conversations(self, limit: int = 10) -> List[Dict]:
         """Get recent conversation history"""

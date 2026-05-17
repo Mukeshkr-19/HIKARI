@@ -7,7 +7,7 @@
 - **Multi-Agent Swarm** - 6 specialized agents (Voice, Research, Files, System, Code, Memory) working autonomously
 - **Multi-Provider AI Routing** - Smart routing across Google, Groq, OpenRouter, Cerebras, DeepSeek, NVIDIA, Cohere
 - **Voice Authentication** - Voice print
-- **Cross-Device** - Laptop as brain, phone/watch as interface via WebSocket 
+- **Cross-Device** - Laptop as brain, phone/watch as interface via WebSocket
 - **File System Access** - Secure, whitelisted file reading and searching
 - **World Awareness** - Real-time news, weather, time, proactive alerts
 - **Memory & Learning** - Persistent conversation history, user preferences, fact learning

@@ -17,6 +17,34 @@ interface AgentStatus {
 
 type TabType = "chat" | "agents" | "files" | "settings";
 
+type BrowserSpeechRecognition = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onstart: (() => void) | null;
+  onresult: ((event: SpeechRecognitionResultEvent) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+};
+
+type SpeechRecognitionConstructor = new () => BrowserSpeechRecognition;
+
+type SpeechRecognitionResultEvent = {
+  results: {
+    [index: number]: {
+      [index: number]: {
+        transcript: string;
+      };
+    };
+  };
+};
+
+type SpeechRecognitionWindow = Window & {
+  SpeechRecognition?: SpeechRecognitionConstructor;
+  webkitSpeechRecognition?: SpeechRecognitionConstructor;
+};
+
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -26,7 +54,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<TabType>("chat");
   const [pairingCode, setPairingCode] = useState("");
   const [isPaired, setIsPaired] = useState(false);
-  const [agents, setAgents] = useState<AgentStatus[]>([
+  const [agents] = useState<AgentStatus[]>([
     { name: "voice", active: true, actions: 0 },
     { name: "research", active: true, actions: 0 },
     { name: "files", active: true, actions: 0 },
@@ -111,12 +139,15 @@ export default function Home() {
   };
 
   const startListening = () => {
-    if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
+    const speechWindow = window as SpeechRecognitionWindow;
+    const SpeechRecognition =
+      speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
       alert("Speech recognition not supported in this browser");
       return;
     }
 
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
     recognition.continuous = false;
     recognition.interimResults = false;
@@ -127,7 +158,7 @@ export default function Home() {
       setOrbState("listening");
     };
 
-    recognition.onresult = (event: any) => {
+    recognition.onresult = (event) => {
       const transcript = event.results[0][0].transcript;
       setInput(transcript);
       setIsListening(false);

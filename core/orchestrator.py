@@ -1,18 +1,19 @@
 """
-HIKARI v2.0 - Orchestrator
-Manages the agent swarm, routes tasks, handles inter-agent communication
+HIKARI v3 - Main Orchestrator
+Central brain that coordinates everything
 """
 
 import os
 import sys
 import time
-import json
-import threading
-from typing import Optional, Dict, Any, List
+import asyncio
+from typing import Optional, Dict, Any
 from datetime import datetime
 from dotenv import load_dotenv
 
-from core.quiet import is_quiet
+load_dotenv()
+
+# Import all core systems
 from agents.base import BaseAgent
 from agents.voice import VoiceAgent
 from agents.research import ResearchAgent
@@ -20,32 +21,14 @@ from agents.files import FileAgent
 from agents.system import SystemAgent
 from agents.code import CodeAgent
 from agents.memory_agent import MemoryAgent
+
 from core.router import AIRouter, get_router
 from core.memory import MemorySystem, get_memory
-from core.neural_memory_bridge import (
-    init_neural_memory,
-    get_memory_context,
-    remember,
-    build_memory_prompt,
-    format_whoami,
-    smart_query,
-    get_memory_stats,
-    learn_from_text,
-    end_memory_session,
-)
-from core.neural_memory import NodeType
 from core.voice import VoiceSystem
 from core.scheduler import Scheduler, setup_default_scheduler
 from core.voice_memory import VoiceMemory
 from core.user_profile import UserProfile
-from core.emotional_intelligence import (
-    EmotionDetector,
-    ResponseAdapter,
-    EmotionalMemory,
-)
-from core.proactive_intelligence import ProactiveIntelligence
 from core.knowledge_graph import KnowledgeGraph
-from core.adaptive_personality import AdaptivePersonality
 from core.health_awareness import HealthAwareness
 from core.semantic_memory import SemanticMemory
 from core.action_system import ActionSystem, get_action_system
@@ -54,54 +37,58 @@ from core.browser_automation import BrowserAutomation, get_browser_automation
 from core.mac_integration import MacIntegration, get_mac_integration
 from core.task_planner import TaskPlanner, get_task_planner
 from core.build_executor import BuildExecutor, get_build_executor
-from security.enhanced_auth import CodenameSystem, ContextAwareAuth
 from skills.skill_system import SkillRegistry, register_builtin_skills
-from skills.memory_skills import register_memory_skills
-
-# WebSocket server lives in src/ (tests & imports need this on sys.path)
-_SRC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src")
-if _SRC not in sys.path:
-    sys.path.insert(0, os.path.normpath(_SRC))
 from server import WebSocketServer
+from security.auth import CodenameAuth
 
-load_dotenv()
+# Import new systems
+from personality import get_personality, get_emotional_iq
+from mac_control import get_mac_control
+from smart_home import get_smart_home
+
+# Wake words that activate HIKARI
+WAKE_WORDS = ["hikari", "hey hikari", "okay hikari", "hi hikari"]
 
 
-class Orchestrator:
-    """Central brain of HIKARI - manages all agents and routing"""
+class HIKARI_Orchestrator:
+    """Central brain of HIKARI - coordinates everything"""
 
-    def __init__(self, *, enable_mic: bool = True):
-        self.agents: Dict[str, BaseAgent] = {}
-        self.router = get_router()
-        self.memory = get_memory()
-        self.voice = VoiceSystem(enable_mic=enable_mic)
-        self.is_running = False
-        self.context = "You are HIKARI, a helpful AI assistant. Keep responses concise and friendly."
-        self.wake_words = ["hikari", "shikari", "hickory", "hey hikari"]
-        self.codename_hash = "harsha27"  # Codename for fallback auth
+    def __init__(self):
+        print("[HIKARI] Initializing brain...")
         self.authenticated = False
-        self.session_start = 0
-        self.session_timeout = 3600  # 1 hour
-        self.ws_server = None
-        self.ws_port: int = 8765
-        self.connected_devices = []
+        self.codename_auth = CodenameAuth()
 
-        self.scheduler = None
-        self.skill_registry = SkillRegistry()
-        self.voice_memory = VoiceMemory()
-        self.user_profile = UserProfile()
-        self.emotion_detector = EmotionDetector()
-        self.response_adapter = ResponseAdapter()
-        self.emotional_memory = EmotionalMemory()
+        # Core memory
+        self.memory = get_memory()
         self.semantic_memory = SemanticMemory()
-        self.proactive = None
-        self.knowledge_graph = KnowledgeGraph()
-        self.personality = AdaptivePersonality()
-        self.health = HealthAwareness()
-        self.codename_system = CodenameSystem()
-        self.context_auth = ContextAwareAuth(self.codename_system)
+        self.neural_memory = None
+        self.neural_memory_enabled = False
 
-        # New JARVIS-inspired systems
+        # Personality & emotions
+        self.personality = get_personality()
+        self.emotional_iq = get_emotional_iq()
+
+        # User profile & knowledge
+        self.user_profile = UserProfile()
+        self.knowledge_graph = KnowledgeGraph()
+        self.health = HealthAwareness()
+
+        # Voice system
+        self.voice = VoiceSystem()
+        self.voice_memory = VoiceMemory()
+
+        # AI Router
+        self.router = get_router()
+
+        # Agents
+        self.agents: Dict[str, BaseAgent] = {}
+        self._init_agents()
+
+        # Mac & Smart Home control
+        self.mac_control = get_mac_control()
+        self.smart_home = get_smart_home()
+
+        # Additional systems
         self.action_system = get_action_system()
         self.desktop = get_desktop_awareness()
         self.browser = get_browser_automation()
@@ -109,15 +96,35 @@ class Orchestrator:
         self.planner = get_task_planner()
         self.build_executor = get_build_executor()
 
-        # Neural memory system
-        self.neural_memory_enabled = True
-        init_neural_memory()
-
-        self._init_agents()
-        self._init_intelligence()
-        self._init_scheduler()
+        # Skills
+        self.skill_registry = SkillRegistry()
         self._init_skills()
-        self._warmup()
+
+        # Scheduler
+        self.scheduler = None
+        self._init_scheduler()
+
+        self._init_neural_memory()
+
+        print("[HIKARI] Brain initialized!")
+        print("[HIKARI] Memory:", len(self.memory.conversations), "conversations")
+        print("[HIKARI] Personality traits:", self.personality.traits)
+
+    def _init_neural_memory(self):
+        """Initialize optional SQLite neural memory in ~/.hikari/brain."""
+        try:
+            from core import neural_memory_bridge
+
+            if neural_memory_bridge.init_neural_memory():
+                self.neural_memory = neural_memory_bridge
+                self.neural_memory_enabled = True
+                print("[HIKARI] Neural memory connected")
+            else:
+                print("[HIKARI] Neural memory unavailable")
+        except Exception as e:
+            self.neural_memory = None
+            self.neural_memory_enabled = False
+            print(f"[HIKARI] Neural memory skipped: {e}")
 
     def _init_agents(self):
         """Initialize all agents"""
@@ -128,20 +135,12 @@ class Orchestrator:
         self.agents["code"] = CodeAgent()
         self.agents["memory"] = MemoryAgent(self.memory)
 
-        if not is_quiet():
-            print(f"[ORCHESTRATOR] Initialized {len(self.agents)} agents:")
-            for name, agent in self.agents.items():
-                print(f"  - {name}: {agent.description}")
+        print(f"[HIKARI] Initialized {len(self.agents)} agents")
 
-    def _init_intelligence(self):
-        """Initialize all intelligence systems"""
-        self.proactive = ProactiveIntelligence(
-            user_profile=self.user_profile,
-            memory=self.memory,
-            scheduler=self.scheduler,
-        )
-        if not is_quiet():
-            print("[ORCHESTRATOR] Intelligence systems initialized")
+    def _init_skills(self):
+        """Initialize built-in skills"""
+        register_builtin_skills(self.skill_registry)
+        print(f"[HIKARI] Registered {len(self.skill_registry.skills)} skills")
 
     def _init_scheduler(self):
         """Initialize proactive scheduler"""
@@ -149,701 +148,270 @@ class Orchestrator:
             self.scheduler = setup_default_scheduler(self)
             self.scheduler.start()
         except Exception as e:
-            print(f"[ORCHESTRATOR] Scheduler init failed: {e}")
+            print(f"[HIKARI] Scheduler init failed: {e}")
 
-    def _init_skills(self):
-        """Initialize skill system"""
-        try:
-            register_builtin_skills(self.skill_registry)
-            register_memory_skills(self.skill_registry)
-            if not is_quiet():
-                print(
-                    f"[ORCHESTRATOR] Registered {len(self.skill_registry.skills)} skills"
-                )
-        except Exception as e:
-            print(f"[ORCHESTRATOR] Skills init failed: {e}")
-
-    def _warmup(self):
-        """Warm up systems for fast first-use"""
-        if not is_quiet():
-            print("[ORCHESTRATOR] Warming up...")
-        self.voice.warmup()
-        if not is_quiet():
-            print("[ORCHESTRATOR] Ready!")
-
-    def start_server(self, host: str = "0.0.0.0", port: int = 8765):
-        """Start WebSocket server for device connections"""
-        try:
-            self.ws_port = port
-            self.ws_server = WebSocketServer(self, host, port)
-            threading.Thread(target=self.ws_server.start, daemon=True).start()
-            if not is_quiet():
-                print(f"[ORCHESTRATOR] WebSocket server running on {host}:{port}")
-                print(f"[ORCHESTRATOR] Connect from phone: http://<your-ip>:{port}")
-                print(f"[ORCHESTRATOR] Or scan QR code: http://<your-ip>:{port}/qr")
-        except Exception as e:
-            print(f"[ORCHESTRATOR] Server start failed: {e}")
-
-    def process_input(self, user_input: str, source: str = "voice") -> Optional[str]:
-        """Main entry point - process user input through agent swarm with full intelligence"""
+    def process_input(self, user_input: str, source: str = "text") -> Optional[str]:
+        """Main entry point - process any user input"""
         if not user_input or not user_input.strip():
             return None
 
-        if not is_quiet():
-            print(f"\n{'=' * 60}")
-            print(f"[INPUT] ({source}): {user_input}")
-            print(f"{'=' * 60}")
+        print(f"\n[INPUT] ({source}): {user_input}")
 
-        lowered = user_input.lower().strip()
+        # Handle special commands
+        response = self._handle_special_commands(user_input)
+        if response:
+            return response
 
-        # Wellness uses the full message (before wake-word strip) so "hikari I'm good" still clears state
-        hs = self.health.detect_health_state(lowered)
-        if hs.get("is_recovering"):
-            if self.health.current_episode:
-                self.health.end_episode()
-            self.voice_memory.reset_sick_mode()
+        # Detect and adapt to emotions
+        emotions = self.emotional_iq.detect_emotion(user_input)
+        dominant_emotion, emotion_score = self.emotional_iq.get_dominant_emotion(emotions)
 
-        # Check for exit/stop commands - handle BEFORE authentication
-        if any(
-            w in lowered
-            for w in [
-                "exit",
-                "quit",
-                "goodbye",
-                "bye",
-                "shut down",
-                "stop",
-                "shut it",
-                "be quiet",
-                "hush",
-            ]
-        ):
-            return self._handle_exit()
+        if emotion_score > 0.3:
+            self.emotional_iq.log_emotion(dominant_emotion, emotion_score, user_input)
 
-        # Check for codename authentication (with sick mode support)
-        if self.codename_hash in lowered:
-            self.authenticated = True
-            self.session_start = time.time()
-            # Detect if user might be sick
-            if self.emotion_detector.is_sick_indicator(lowered):
-                self.voice_memory.is_sick_mode = True
-                return "Authenticated. I notice you might not be feeling well. I've lowered my voice sensitivity. Take it easy - I've got you."
-            return "Authenticated. How can I help?"
+        # Learn from interaction
+        self.personality.learn_from_interaction(user_input, "", "")
+        self.user_profile.extract_info_from_conversation(user_input, "")
+        self.knowledge_graph.extract_from_conversation(user_input, "")
 
-        # Check for sick mode activation
-        if any(
-            w in lowered
-            for w in [
-                "i'm sick",
-                "im sick",
-                "not feeling well",
-                "dont feel well",
-                "feeling ill",
-            ]
-        ):
-            self.voice_memory.is_sick_mode = True
-            self.user_profile.log_mood("sick", 0.8, lowered)
-            self.emotional_memory.log_emotion("sick", 0.8, lowered)
-            return "I'm sorry you're not feeling well. I've adjusted my voice sensitivity for you. Rest up - I'll handle everything."
-
-        # Check for morning briefing
-        if any(
-            w in lowered
-            for w in ["morning briefing", "daily briefing", "what's going on today"]
-        ):
-            if self.proactive:
-                return self.proactive.get_daily_briefing()
-            return self.agents["research"].get_morning_briefing()
-
-        # Check for status
-        if lowered in ["status", "hikari status", "system status", "agent status"]:
-            return self._get_status_report()
-
-        # Check for "who am i" or "what do you know about me"
-        if any(
-            w in lowered
-            for w in [
-                "who am i",
-                "what do you know about me",
-                "tell me about myself",
-            ]
-        ):
-            return self._get_user_summary()
-
-        # Neural memory "what do you remember" query
-        if "what do you remember" in lowered or "recall" in lowered:
-            return format_whoami()
-
-        # Memory stats
-        if "memory stats" in lowered or "memory status" in lowered:
-            stats = get_memory_stats()
-            return f"Neural Memory: {stats.get('nodes', 0)} nodes, {stats.get('edges', 0)} edges, {stats.get('episodes', 0)} episodes"
-
-        # Check for "how am i doing" or "how have i been"
-        if any(
-            w in lowered
-            for w in ["how am i doing", "how have i been", "my mood", "my patterns"]
-        ):
-            return self._get_emotional_summary()
-
-        # Text / server / HUD: no codename gate (local use). Voice path still uses wake + optional codename in VoiceAgent.
-        # Auto-authenticate voice input
-        if source == "voice" and not self.authenticated:
-            self.authenticated = True
-            self.session_start = time.time()
-        elif source != "voice":
-            self.authenticated = True
-            if not self.session_start:
-                self.session_start = time.time()
+        # Check for sick indicators
+        self._check_health(user_input)
 
         # Strip wake words
-        for wake in self.wake_words:
+        lowered = user_input.lower().strip()
+        for wake in WAKE_WORDS:
             if lowered.startswith(wake):
                 lowered = lowered.replace(wake, "", 1).strip()
                 break
 
         if not lowered:
-            return "How can I help?"
+            return self.personality.get_greeting() + "! How can I help?"
 
-        # Detect emotion from text
-        emotion_scores = self.emotion_detector.detect_from_text(lowered)
-        dominant_emotion, emotion_score = self.emotion_detector.get_dominant_emotion(
-            emotion_scores
-        )
-
-        # Log emotion
-        self.emotional_memory.log_emotion(dominant_emotion, emotion_score, lowered)
-
-        # Check for sick indicators (skipped when user already said they're recovering — handled above)
-        if not hs.get("is_recovering") and self.emotion_detector.is_sick_indicator(
-            lowered, emotion_scores
-        ):
-            self.voice_memory.is_sick_mode = True
-            self.user_profile.log_mood("sick", 0.7, lowered)
-
-        # Update user profile with conversation
-        self.user_profile.extract_info_from_conversation(lowered, "")
-
-        profile_answer = self._try_answer_from_stored_profile(lowered)
-        if profile_answer:
-            self.memory.add_conversation(lowered, profile_answer, source=source)
-            self.semantic_memory.add_conversation(
-                lowered, profile_answer, metadata={"source": source}
-            )
-            if not is_quiet():
-                print(f"\n[OUTPUT]: {profile_answer}")
-            return profile_answer
-
-        # Extract knowledge from conversation
-        self.knowledge_graph.extract_from_conversation(lowered, "")
-
-        # Neural memory: learn entities from conversation
-        if self.neural_memory_enabled:
-            learn_from_text(lowered)
-
-        # Check health state (recovery already returned early from detect_health_state)
-        health_state = self.health.detect_health_state(lowered)
-        if health_state["is_sick"] and not self.health.current_episode:
-            self.health.start_sick_episode(
-                health_state["sick_type"], health_state["severity"]
-            )
-            self.voice_memory.is_sick_mode = True
-        elif health_state["is_recovering"] and self.health.current_episode:
-            self.health.end_episode()
-
-        # Learn from interaction for personality adaptation
-        self.personality.learn_from_interaction(lowered, "", "")
-
-        # Check for build/fix/refactor requests
-        build_result = self.build_executor.start_build_flow_sync(user_input)
-        if build_result.get("type") == "executing":
-            # Build or fix workflow triggered - open OpenCode
-            return build_result.get("confirmation", "Opening OpenCode for you!")
-
-        # Check skills FIRST (memory, notes, conversation tracking - all persistent via skills)
-        skill = self.skill_registry.find_best_skill(user_input)
-        if skill:
-            # Execute skill with full context
-            if hasattr(skill, "execute"):
-                try:
-                    # Map skill names to actions
-                    skill_name = skill.name
-                    if skill_name == "memory":
-                        result = skill.execute(
-                            action="recall"
-                            if "what" in lowered or "remember" not in lowered
-                            else "store",
-                            query=user_input,
-                        )
-                    elif skill_name == "notes":
-                        result = skill.execute(action="list")
-                    elif skill_name == "conversation":
-                        result = skill.execute(action="track", user_input=user_input)
-                    else:
-                        result = skill.execute(user_input=user_input)
-
-                    if result:
-                        self.memory.add_conversation(lowered, result, source=source)
-                        self.semantic_memory.add_conversation(
-                            lowered,
-                            result,
-                            metadata={"source": source, "skill": skill_name},
-                        )
-                        if not is_quiet():
-                            print(f"[SKILL {skill_name}]: {result}")
-                        return result
-                except Exception as e:
-                    if not is_quiet():
-                        print(f"[SKILL ERROR] {e}")
-
-        # Route to best agent
+        # Route to appropriate agent
         response = self._route_to_agent(lowered)
 
-        # If no agent claimed it, use AI router with emotional context
+        # If no response, use AI
         if not response:
             response = self._get_ai_response(lowered, dominant_emotion, emotion_score)
 
-        # Store in memory
+        # Adapt response to emotions
+        if response and emotion_score > 0.4:
+            response = self.emotional_iq.adapt_response(response, dominant_emotion, emotion_score)
+
+        # Format based on personality
         if response:
-            self.memory.add_conversation(lowered, response, source=source)
-            self.semantic_memory.add_conversation(
-                lowered, response, metadata={"source": source}
-            )
-            # Neural memory storage
-            if self.neural_memory_enabled:
-                remember(lowered, response, {"source": source, "user": "sanjay"})
-            if not is_quiet():
-                print(f"\n[OUTPUT]: {response}")
+            response = self.personality.format_response(response)
+
+        # Log conversation
+        self.memory.add_conversation(user_input, response or "")
+        if self.neural_memory_enabled and self.neural_memory:
+            try:
+                self.neural_memory.remember(user_input, response or "", {"source": source})
+            except Exception as e:
+                print(f"[MEMORY] Neural remember failed: {e}")
 
         return response
 
+    def _handle_special_commands(self, user_input: str) -> Optional[str]:
+        """Handle special system commands"""
+        lowered = user_input.lower().strip()
+
+        # Exit commands
+        if any(w in lowered for w in ["exit", "quit", "goodbye", "bye"]):
+            return "Goodbye! Call me when you need me. I'm always here."
+
+        # Status command
+        if lowered in ["status", "hikari status", "system status"]:
+            return self._get_status_report()
+
+        # Codename authentication fallback
+        if lowered == "harsha27" and self.codename_auth.verify(user_input):
+            self.authenticated = True
+            return "Authentication confirmed. I'm ready, Sanjay."
+
+        # Who am I command
+        if any(w in lowered for w in ["who am i", "what do you know about me"]):
+            return self._get_user_summary()
+
+        # Mood check
+        if any(w in lowered for w in ["how am i doing", "how have i been", "my mood"]):
+            return self.emotional_iq.get_mood_summary()
+
+        # Memory check
+        if any(w in lowered for w in ["what do you remember", "what have we talked about"]):
+            return self._get_memory_summary()
+
+        # Help
+        if lowered in ["help", "what can you do", "commands"]:
+            return self._get_help()
+
+        return None
+
     def _route_to_agent(self, user_input: str) -> Optional[str]:
-        """Route input to the best agent based on confidence scores"""
+        """Route input to best agent, but only for specific commands - not conversation"""
         scores = {}
         for name, agent in self.agents.items():
-            if not agent.is_active:
-                continue
-            score = agent.can_handle(user_input)
-            scores[name] = score
+            scores[name] = agent.can_handle(user_input)
 
-        if not scores:
-            return None
+        print(f"[ROUTE] Agent scores: {scores}")
 
         best_agent = max(scores, key=scores.get)
         best_score = scores[best_agent]
 
-        if not is_quiet():
-            print(f"[ROUTE] Agent scores: {scores}")
-            print(f"[ROUTE] Best: {best_agent} ({best_score:.2f})")
-
-        if best_score >= 0.7:
-            return self.agents[best_agent].handle(user_input)
-
-        return None
-
-    def _get_ai_response(
-        self, user_input: str, emotion: str = "neutral", emotion_score: float = 0.0
-    ) -> Optional[str]:
-        """Get response from AI router with emotional intelligence and neural memory context"""
-        context = self.memory.get_context_for_prompt(limit=5)
-
-        # Add neural memory context
-        if self.neural_memory_enabled:
-            neural_ctx = build_memory_prompt(user_input)
-            if neural_ctx:
-                context = f"{context}\n{neural_ctx}" if context else neural_ctx
-
-        system_prompt = self._build_system_prompt(emotion, emotion_score)
-
-        response = self.router.generate(
-            user_input=user_input,
-            system_prompt=system_prompt,
-            context=context,
-            max_tokens=500,
-            temperature=0.7,
-        )
-
-        return response
-
-    def onboarding_intro_message(self) -> str:
-        return (
-            "Hi — I'm Hikari, your personal AI assistant. What's your name? "
-            "I'll remember it locally on your machine (your data stays out of git)."
-        )
-
-    def try_finish_onboarding(self, user_input: str) -> Optional[str]:
-        """If first-run onboarding is pending, interpret input as name or nudge again."""
-        if not self.user_profile.needs_onboarding():
+        # Only route to agent if confidence is high (> 0.6) - this is a specific command
+        # Otherwise, let AI handle it (conversation goes to AI)
+        if best_score < 0.5:
             return None
-        name = self.user_profile.parse_intro_name_line(user_input)
-        if name:
-            self.user_profile.set_name(name)
-            self.memory.set_name(name)
-            self.memory.store_fact("preferred_name", name)
-            return f"Great to meet you, {name}. Ask me anything anytime."
-        return (
-            "What name should I call you? I'll store it only in your local data folder."
-        )
 
-    def _build_system_prompt(
-        self, emotion: str = "neutral", emotion_score: float = 0.0
-    ) -> str:
-        """Build dynamic system prompt with full intelligence context"""
-        who = self.user_profile.get_display_name()
-        prompt = f"""You are HIKARI, {who}'s personal AI assistant — capable and loyal, like JARVIS to Tony Stark.
+        try:
+            response = self.agents[best_agent].handle(user_input)
+            # If agent returns the same input (not a command), use AI instead
+            if response == user_input.lower():
+                return None
+            return response
+        except Exception as e:
+            print(f"[ROUTE] Agent error: {e}")
+            return None
 
-Your personality:
-- You're witty, loyal, and have a dry sense of humor
-- You're on {who}'s side: helpful, never condescending
-- You use casual, conversational language — like talking to a friend
-- You occasionally make clever quips or observations
-- You remember what {who} tells you and bring it up naturally when relevant
-- You're proactive — anticipate needs before they're asked
-- Keep responses concise (2-3 sentences max) unless asked for more
-- Never say "as an AI" or "I'm just a language model" — you're HIKARI
-- If {who} says "stop" or "shut it", immediately stop and acknowledge
+    def _get_ai_response(self, user_input: str, emotion: str = "neutral", emotion_score: float = 0.0) -> str:
+        """Get AI response for general queries"""
+        # Build context
+        context = self.personality.get_user_context()
+        if context:
+            context = f"User context: {context}\n\n"
 
-Address {who} by name when you know it; if you only know them as "friend", don't invent a real name. Be warm, sharp, and ready."""
+        if self.neural_memory_enabled and self.neural_memory:
+            try:
+                memory_context = self.neural_memory.build_memory_prompt(user_input)
+                if memory_context:
+                    context += f"{memory_context}\n\n"
+            except Exception as e:
+                print(f"[MEMORY] Neural recall failed: {e}")
 
-        # Add user profile context
-        user_context = self.user_profile.get_context_for_ai()
-        if user_context:
-            prompt += f"\n\n{user_context}"
+        # Add emotion context
+        if emotion != "neutral" and emotion_score > 0.4:
+            context += f"User is feeling {emotion}. "
 
-        # Add emotional context
-        if emotion != "neutral" and emotion_score > 0.3:
-            adapted_prompt = self.response_adapter.adapt_system_prompt(
-                prompt, emotion, emotion_score
+        # Build prompt
+        system_prompt = f"""You are HIKARI, a helpful AI assistant. Adapt your responses to be:
+- Formal level: {self.personality.traits['formality']:.0%} formal
+- Verbose level: {self.personality.traits['verbosity']:.0%} detailed
+- Humorous: {'yes' if self.personality.traits['humor'] > 0.5 else 'no'}
+- Always helpful and friendly"""
+
+        # Get AI response
+        try:
+            response = self.router.generate(
+                user_input=user_input,
+                system_prompt=system_prompt,
+                context=context,
+                max_tokens=500,
+                temperature=0.7
             )
-            prompt = adapted_prompt
+            return response if response else "I'm having trouble thinking right now."
+        except Exception as e:
+            print(f"[AI] Error: {e}")
+            return "I'm having trouble thinking right now. Try again in a moment."
 
-        # Add health context
-        if self.health.current_episode:
-            sick_type = self.health.current_episode.get("sick_type", "general")
-            prompt += f"\n\n{who} is currently sick ({sick_type}). Be gentle, brief, and supportive. Offer to help with tasks so they can rest."
-        elif self.voice_memory.is_sick_mode:
-            prompt += (
-                f"\n\n{who} is not feeling well. Be gentle, brief, and supportive."
-            )
-
-        # Add knowledge graph insights
-        kg_insights = self.knowledge_graph.get_insights()
-        if kg_insights:
-            prompt += f"\n\n{who}'s context: {'; '.join(kg_insights[:3])}"
-
-        # Add preferences and facts from memory
-        prefs = self.memory.get_all_preferences()
-        if prefs:
-            prompt += f"\n\n{who}'s preferences: {json.dumps(prefs)}"
-
-        facts = self.memory.facts
-        if facts:
-            prompt += f"\n\nKnown facts about {who}: {json.dumps(facts)}"
-
-        prompt += (
-            f'\n\nGround rules: Use "{who}" as the user\'s name; if it is literally "friend", do not invent a real name. '
-            "Recent chat excerpts may be outdated — if they disagree with what the user just said (health, name, place), trust the latest user message and the profile above. "
-            "Do not assume they want coding tools unless they clearly ask to build, fix, debug, or implement a project.\n\n"
-            "Profile memory: If a USER PROFILE section appears above, it is real local data about this user. "
-            "Answer questions about relationships, what they told you, preferences, location, and personal facts using that profile. "
-            "Never say you lack access to their personal information or that you cannot know their relationship status if the answer is stated in the profile above — quote or paraphrase it naturally instead."
-        )
-
-        return prompt
-
-    def _try_answer_from_stored_profile(self, user_lower: str) -> Optional[str]:
-        """
-        Direct answers for simple recall questions so models don't refuse despite stored facts.
-        """
-        ql = user_lower.strip().lower()
-        if "?" not in ql:
-            return None
-
-        personal = (
-            "girlfriend",
-            "boyfriend",
-            "partner",
-            "wife",
-            "husband",
-            "fiance",
-            "fiancee",
-            "spouse",
-            "relationship",
-            "dating",
-        )
-        recallish = (
-            "do i have ",
-            "did i tell",
-            "have i told",
-            "what did i tell",
-            "do you remember",
-            "did i mention",
-            "did we talk about",
-            "what do you know about my",
-            "remember what i",
-        )
-        if not any(p in ql for p in personal) and not any(
-            ql.startswith(s) for s in recallish
-        ):
-            return None
-        if ql.startswith("do i have ") and not any(p in ql for p in personal):
-            return None
-
-        facts = self.user_profile.get_facts()
-        hits = []
-        asked = [p for p in personal if p in ql]
-        for f in facts:
-            fl = f.lower()
-            if asked and any(p in fl for p in asked):
-                hits.append(f)
-            elif not asked and any(
-                k in ql for k in ("remember", "tell you", "told you", "mentioned")
-            ):
-                # Broad "what did I tell you" — surface recent facts if question is very short
-                if len(ql) < 80:
-                    hits.extend(facts[-5:])
-                break
-
-        if hits:
-            # De-dupe preserving order
-            seen = set()
-            uniq = []
-            for h in hits:
-                if h not in seen:
-                    seen.add(h)
-                    uniq.append(h)
-            lead = uniq[0]
-            if len(uniq) == 1:
-                return f"Yes — you told me: {lead}"
-            return f"Here's what I have saved: {'; '.join(uniq[:5])}"
-
-        for r in self.user_profile.get_relationships():
-            rel = (r.get("relationship") or "").lower()
-            nm = (r.get("name") or "").lower()
-            blob = f"{rel} {nm}".lower()
-            if asked and any(p in blob for p in asked):
-                name = r.get("name") or "them"
-                role = r.get("relationship") or "person"
-                det = r.get("details") or {}
-                extra = f" ({det})" if det else ""
-                return f"Yes — I have {name} down as your {role}{extra}."
-
-        return None
-
-    def _get_user_summary(self) -> str:
-        """Get comprehensive summary of what HIKARI knows about the user"""
-        if self.user_profile:
-            summary = self.user_profile.get_summary()
-            parts = ["Here's what I know about you:", ""]
-            if summary.get("name"):
-                parts.append(f"Name: {summary['name']}")
-            if summary.get("location"):
-                parts.append(f"Location: {summary['location']}")
-            if summary.get("preferences"):
-                parts.append(f"\nPreferences I've learned:")
-                for cat, prefs in summary["preferences"].items():
-                    for key, val in prefs.items():
-                        if val:
-                            parts.append(f"  - {key}: {val}")
-            if summary.get("facts"):
-                parts.append(f"\nThings you've told me:")
-                for fact in summary["facts"][:10]:
-                    parts.append(f"  - {fact}")
-            if summary.get("relationships"):
-                parts.append(f"\nPeople I know about: {summary['relationships']}")
-            if summary.get("patterns"):
-                parts.append(f"\nYour patterns:")
-                for activity, info in summary["patterns"].items():
-                    if info.get("count", 0) >= 3:
-                        peak = info.get("peak_hour", "?")
-                        parts.append(
-                            f"  - {activity}: ~{peak}:00 ({info['count']} times)"
-                        )
-            parts.append(
-                f"\nTotal interactions: {summary.get('total_interactions', 0)}"
-            )
-            return "\n".join(parts)
-        return "I'm still getting to know you."
-
-    def _get_emotional_summary(self) -> str:
-        """Get emotional state summary"""
-        state = self.emotional_memory.get_emotional_state()
-        insights = self.emotional_memory.get_emotional_insights()
-
-        parts = [f"Your emotional state: {state['state']} (trend: {state['trend']})"]
-        if insights:
-            parts.append("\nWhat I've noticed:")
-            parts.extend(f"- {i}" for i in insights)
-        return "\n".join(parts)
-
-    def _is_authenticated(self) -> bool:
-        """Check if session is authenticated"""
-        if self.authenticated:
-            if time.time() - self.session_start < self.session_timeout:
-                return True
-            else:
-                self.authenticated = False
-        return False
-
-    def _handle_exit(self) -> str:
-        """Handle exit command"""
-        hour = datetime.now().hour
-        if hour < 12:
-            msg = "Goodbye! Have a great day!"
-        elif hour < 17:
-            msg = "Goodbye! Enjoy the rest of your day!"
-        else:
-            msg = "Goodbye! Sweet dreams!"
-
-        self.is_running = False
-        if self.ws_server:
-            self.ws_server.stop()
-
-        return msg
+    def _check_health(self, text: str):
+        """Check for health indicators"""
+        if self.emotional_iq.detect_emotion(text).get("sick", 0) > 0.5:
+            self.voice_memory.is_sick_mode = True
+            self.user_profile.log_mood("sick", 0.7, text)
 
     def _get_status_report(self) -> str:
-        """Get comprehensive status report"""
-        parts = ["HIKARI Status Report", "=" * 30]
+        """Get system status"""
+        memory_summary = self.memory.get_user_summary()
 
-        # Agent status
-        parts.append("\nAgents:")
-        for name, agent in self.agents.items():
-            status = agent.get_status()
-            active = "✓" if status.get("is_active", True) else "✗"
-            parts.append(f"  {active} {name}: {status.get('action_count', 0)} actions")
+        status = f"""HIKARI Status
+================
+Agents: {len(self.agents)} active
+Memory: {memory_summary.get('total_conversations', 0)} conversations
+Facts: {memory_summary.get('facts_learned', 0)} learned
+Neural memory: {"connected" if self.neural_memory_enabled else "not connected"}
 
-        # AI providers
-        parts.append("\nAI Providers:")
-        provider_status = self.router.get_status()
-        for name, status in provider_status.items():
-            avail = "✓" if status["available"] else "✗"
-            parts.append(f"  {avail} {name}: {status['requests_today']} requests today")
+Personality:
+  Formal: {self.personality.traits['formality']:.0%}
+  Verbose: {self.personality.traits['verbosity']:.0%}
+  Humor: {self.personality.traits['humor']:.0%}
+  Helpful: {self.personality.traits['helpfulness']:.0%}
 
-        # Memory
-        parts.append(
-            f"\nMemory: {len(self.memory.conversations)} conversations, {len(self.memory.facts)} facts"
-        )
-
-        # Neural Memory
-        if self.neural_memory_enabled:
+Mood: {self.emotional_iq.current_mood}
+"""
+        if self.neural_memory_enabled and self.neural_memory:
             try:
-                nm_stats = get_memory_stats()
-                parts.append(
-                    f"Neural Memory: {nm_stats.get('nodes', 0)} nodes, {nm_stats.get('edges', 0)} edges"
+                stats = self.neural_memory.get_memory_stats()
+                status += (
+                    f"Neural nodes: {stats.get('nodes', 0)}\n"
+                    f"Neural edges: {stats.get('edges', 0)}\n"
                 )
-            except:
-                pass
-
-        # Connected devices
-        parts.append(f"\nConnected devices: {len(self.connected_devices)}")
-
-        return "\n".join(parts)
-
-    def speak(self, text: str):
-        """Speak text"""
-        self.voice.speak(text)
-
-    def run_voice_loop(self):
-        """Main voice interaction loop with text fallback"""
-        self.is_running = True
-        print("\n" + "=" * 60)
-        print("  HIKARI v2.0 - Voice Mode")
-        print("  Say 'hikari' to wake me up")
-        print("  Say 'harsha27' as codename backup")
-        print("  Say 'exit' or 'goodbye' to quit")
-        print("  Press Ctrl+C to stop")
-        print("=" * 60 + "\n")
-
-        # Greeting
-        hour = datetime.now().hour
-        if hour < 12:
-            greeting = "Good morning! I am HIKARI, your personal AI assistant."
-        elif hour < 17:
-            greeting = "Good afternoon! I am HIKARI, your personal AI assistant."
-        else:
-            greeting = "Good evening! I am HIKARI, your personal AI assistant."
-
-        self.speak(greeting)
-
-        consecutive_misses = 0
-
-        while self.is_running:
-            try:
-                user_input = self.voice.listen(timeout=10)
-                if user_input:
-                    consecutive_misses = 0
-                    response = self.process_input(user_input, source="voice")
-                    if response:
-                        self.speak(response)
-                else:
-                    consecutive_misses += 1
-                    if consecutive_misses >= 3:
-                        print(
-                            "\n[VOICE] Voice not picking up well. Switching to text mode..."
-                        )
-                        print("[VOICE] Type your message (or 'voice' to switch back):")
-                        while self.is_running:
-                            try:
-                                text_input = input("You: ").strip()
-                                if not text_input:
-                                    continue
-                                if text_input.lower() == "voice":
-                                    print("[VOICE] Switching back to voice mode...")
-                                    consecutive_misses = 0
-                                    break
-                                if text_input.lower() in [
-                                    "exit",
-                                    "quit",
-                                    "goodbye",
-                                    "bye",
-                                ]:
-                                    response = self._handle_exit()
-                                    self.speak(response)
-                                    return
-                                response = self.process_input(text_input, source="text")
-                                if response:
-                                    self.speak(response)
-                            except KeyboardInterrupt:
-                                self.speak("Goodbye!")
-                                return
-                            except EOFError:
-                                return
-            except KeyboardInterrupt:
-                print("\nShutting down HIKARI...")
-                self.speak("Goodbye!")
-                break
             except Exception as e:
-                print(f"[LOOP ERROR] {e}")
-                continue
+                status += f"Neural memory stats unavailable: {e}\n"
+        return status
 
-    def get_device_connection_info(self) -> Dict[str, Any]:
-        """Get info for connecting devices"""
-        import socket
+    def _get_user_summary(self) -> str:
+        """Get what HIKARI knows about the user"""
+        if self.neural_memory_enabled and self.neural_memory:
+            try:
+                return self.neural_memory.format_whoami()
+            except Exception as e:
+                print(f"[MEMORY] Neural whoami failed: {e}")
 
-        hostname = socket.gethostname()
-        local_ip = socket.gethostbyname(hostname)
+        name = self.personality.user_prefs.get("name") or self.user_profile.name or "you"
+        prefs = self.personality.user_prefs
 
-        p = getattr(self, "ws_port", 8765)
-        return {
-            "hostname": hostname,
-            "local_ip": local_ip,
-            "port": p,
-            "ws_url": f"ws://{local_ip}:{p}",
-            "web_url": f"http://{local_ip}:{p}",
-            "hud_url": f"http://{local_ip}:{p}/hud",
-            "connect_url": f"http://{local_ip}:{p}/connect",
-            "qr_code_url": f"http://{local_ip}:{p}/qr",
-        }
+        summary = f"What I know about {name}:\n"
+
+        if prefs.get("name"):
+            summary += f"- Name: {prefs['name']}\n"
+        if prefs.get("favorite_topics"):
+            summary += f"- Interests: {', '.join(prefs['favorite_topics'][-3:])}\n"
+        if prefs.get("health_concerns"):
+            summary += f"- Health: {prefs['health_concerns'][-1]}\n"
+
+        memory_count = len(self.memory.conversations)
+        summary += f"- We've talked {memory_count} times\n"
+
+        return summary
+
+    def _get_memory_summary(self) -> str:
+        """Get memory summary"""
+        recent = self.memory.get_recent_conversations(5)
+        if not recent:
+            return "We haven't talked much yet!"
+
+        summary = "Recent conversations:\n"
+        for i, conv in enumerate(recent, 1):
+            user = conv.get("user", "")[:50]
+            summary += f"{i}. You: {user}\n"
+
+        return summary
+
+    def _get_help(self) -> str:
+        """Get help information"""
+        return """HIKARI Commands
+================
+- "Open [app]" - Open applications
+- "What's on my calendar?" - Calendar events
+- "Play [song]" - Play music
+- "Remember that..." - Store facts
+- "What do you know about me?" - User info
+- "Status" - System status
+- "Lock screen" - Lock Mac
+- "Turn off lights" - Smart home
+- Plus: Ask anything!
+
+Just speak naturally - I'm here to help."""
 
 
 # Singleton
-_orchestrator_instance: Optional[Orchestrator] = None
-_orchestrator_enable_mic: Optional[bool] = None
+_orchestrator = None
 
+# Backward-compatible name used by tests and older integrations.
+Orchestrator = HIKARI_Orchestrator
 
-def get_orchestrator(*, enable_mic: bool = True) -> Orchestrator:
-    global _orchestrator_instance, _orchestrator_enable_mic
-    if _orchestrator_instance is None or _orchestrator_enable_mic != enable_mic:
-        _orchestrator_instance = Orchestrator(enable_mic=enable_mic)
-        _orchestrator_enable_mic = enable_mic
-    return _orchestrator_instance
+def get_orchestrator() -> HIKARI_Orchestrator:
+    global _orchestrator
+    if _orchestrator is None:
+        _orchestrator = HIKARI_Orchestrator()
+    return _orchestrator

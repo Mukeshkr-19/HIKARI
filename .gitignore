@@ -40,20 +40,40 @@ wheels/
 
 # Old/Deprecated
 js.py
+Main.py
+model_registry.py
+model_switcher.py
+router.py
 
 # Data (keep structure, not content)
 data/*.json
-data/voiceprint.bin
+data/*.bin
 data/voice_auth.json
+data/voice_prints/
 data/voice_memory/
 data/hf_cache/
-data/episodes/
 !data/.gitkeep
+
+# Local brain/runtime stores
+.hikari/
+HIKARI-private/
+.claw-workflow/
+HIKARI_OPERATING_GUIDE.md
+HIKARI_ROADMAP.md
+docs/HIKARI_ROADMAP.md
+docs/WORK_DONE.md
+*.db
+*.sqlite
+*.sqlite3
 
 # Frontend
 hikari-frontend/.next/
 hikari-frontend/node_modules/
 hikari-frontend/out/
+
+# OS
+Thumbs.db
+.DS_Store
 
 # Logs
 *.log
@@ -63,6 +83,3 @@ logs/
 .pytest_cache/
 .coverage
 htmlcov/
-
-# OS
-Thumbs.db

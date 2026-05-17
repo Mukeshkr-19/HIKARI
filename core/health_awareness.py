@@ -10,8 +10,6 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from collections import Counter
 
-from core.quiet import is_quiet
-
 DATA_DIR = Path(__file__).parent.parent / "data"
 HEALTH_FILE = DATA_DIR / "health_data.json"
 
@@ -59,23 +57,6 @@ class HealthAwareness:
         "good again",
         "improving",
         "getting better",
-        "not sick",
-        "not ill",
-        "no longer sick",
-        "im good",
-        "i'm good",
-        "im fine",
-        "i'm fine",
-        "im well",
-        "i'm well",
-        "im okay",
-        "i'm okay",
-        "feeling good",
-        "feeling fine",
-        "all good",
-        "better now",
-        "good now",
-        "fully recovered",
     ]
 
     def __init__(self):
@@ -117,11 +98,6 @@ class HealthAwareness:
             "is_recovering": False,
             "recommendations": [],
         }
-
-        # Recovery / "I'm fine" beats substring false positives like "sick" inside "not sick"
-        if any(r in lower for r in self.RECOVERY_INDICATORS):
-            state["is_recovering"] = True
-            return state
 
         # Check for sick indicators
         sick_matches = [w for w in self.SICK_INDICATORS if w in lower]
@@ -174,8 +150,7 @@ class HealthAwareness:
             "notes": [],
         }
         self._save()
-        if not is_quiet():
-            print(f"[HEALTH] Sick episode started: {sick_type} (severity: {severity:.2f})")
+        print(f"[HEALTH] Sick episode started: {sick_type} (severity: {severity:.2f})")
 
     def update_episode(self, severity: float, notes: str = ""):
         """Update current sick episode"""
@@ -218,8 +193,7 @@ class HealthAwareness:
             self.sick_episodes.append(self.current_episode)
             self.current_episode = None
             self._save()
-            if not is_quiet():
-                print("[HEALTH] Sick episode ended - recovered!")
+            print("[HEALTH] Sick episode ended - recovered!")
 
     def _get_recommendations(self, sick_type: str) -> List[str]:
         """Get health recommendations"""

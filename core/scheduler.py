@@ -11,8 +11,6 @@ from typing import Optional, Dict, Any, List, Callable
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from core.quiet import is_quiet
-
 DATA_DIR = Path(__file__).parent.parent / "data"
 SCHEDULES_FILE = DATA_DIR / "schedules.json"
 
@@ -137,8 +135,7 @@ class Scheduler:
         """Add a recurring task"""
         task = ScheduledTask(name, interval_seconds, callback)
         self.tasks.append(task)
-        if not is_quiet():
-            print(f"[SCHEDULER] Added task: {name} (every {interval_seconds}s)")
+        print(f"[SCHEDULER] Added task: {name} (every {interval_seconds}s)")
         return task
 
     def add_alert(
@@ -151,23 +148,20 @@ class Scheduler:
         """Add a conditional alert rule"""
         alert = AlertRule(name, condition, action, cooldown)
         self.alerts.append(alert)
-        if not is_quiet():
-            print(f"[SCHEDULER] Added alert: {name}")
+        print(f"[SCHEDULER] Added alert: {name}")
 
     def start(self):
         """Start the scheduler loop"""
         self._running = True
         self._thread = threading.Thread(target=self._loop, daemon=True)
         self._thread.start()
-        if not is_quiet():
-            print("[SCHEDULER] Started")
+        print("[SCHEDULER] Started")
 
     def stop(self):
         self._running = False
         if self._thread:
             self._thread.join(timeout=5)
-        if not is_quiet():
-            print("[SCHEDULER] Stopped")
+        print("[SCHEDULER] Stopped")
 
     def _loop(self):
         while self._running:
