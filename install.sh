@@ -34,7 +34,7 @@ if [ ! -f ".env" ] && [ -f ".env.example" ]; then
   echo "Edit .env and add at least one AI provider key (see README)."
 fi
 
-chmod +x hikari bin/Hikari 2>/dev/null || true
+chmod +x bin/Hikari 2>/dev/null || true
 chmod +x "$REPO_ROOT/scripts/install-hikari-login-agent.sh" \
   "$REPO_ROOT/scripts/uninstall-hikari-login-agent.sh" 2>/dev/null || true
 
@@ -42,7 +42,7 @@ chmod +x "$REPO_ROOT/scripts/install-hikari-login-agent.sh" \
 HB="$HOME/bin"
 mkdir -p "$HB"
 ln -sf "$REPO_ROOT/bin/Hikari" "$HB/Hikari"
-ln -sf "$REPO_ROOT/hikari" "$HB/hikari"
+ln -sf "$REPO_ROOT/bin/Hikari" "$HB/hikari"
 if [[ ":$PATH:" != *":$HB:"* ]]; then
   echo ""
   echo "To run Hikari from anywhere, add this line to ~/.zshrc (or ~/.bashrc):"
@@ -57,7 +57,7 @@ echo "Activate the environment:"
 echo "  source .venv/bin/activate"
 echo ""
 echo "CLI from repo folder:"
-echo "  ./hikari   or   ./bin/Hikari"
+echo "  ./bin/Hikari"
 echo ""
 echo "After PATH includes \$HOME/bin:"
 echo "  Hikari"
