@@ -207,19 +207,19 @@ class TestCodenameAuth(unittest.TestCase):
     def test_correct_codename(self):
         from security.auth import CodenameAuth
 
-        auth = CodenameAuth("harsha27")
-        self.assertTrue(auth.verify("harsha27"))
+        auth = CodenameAuth("test-codename")
+        self.assertTrue(auth.verify("test-codename"))
 
     def test_wrong_codename(self):
         from security.auth import CodenameAuth
 
-        auth = CodenameAuth("harsha27")
+        auth = CodenameAuth("test-codename")
         self.assertFalse(auth.verify("wrong"))
 
     def test_lockout(self):
         from security.auth import CodenameAuth
 
-        auth = CodenameAuth("harsha27")
+        auth = CodenameAuth("test-codename")
         for _ in range(5):
             auth.verify("wrong")
         self.assertTrue(auth.locked)
@@ -280,7 +280,7 @@ class TestOrchestrator(unittest.TestCase):
         from core.orchestrator import Orchestrator
 
         orch = Orchestrator()
-        result = orch.process_input("harsha27")
+        result = orch.process_input("change-me")
         self.assertIsNotNone(result)
         self.assertTrue(orch.authenticated)
 

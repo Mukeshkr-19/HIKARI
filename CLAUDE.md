@@ -84,7 +84,7 @@ hikari/
 ## Quick Start
 
 ```bash
-cd ~/PycharmProjects/HIKARI
+cd HIKARI
 source .venv/bin/activate
 pip install -r requirements.txt
 

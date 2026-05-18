@@ -25,7 +25,7 @@ HIKARI v2.0 is a fully autonomous, multi-agent AI assistant that:
 ### 2. Configure
 
 ```bash
-cd ~/PycharmProjects/HIKARI
+cd HIKARI
 source .venv/bin/activate
 
 # Edit .env file
@@ -62,7 +62,7 @@ python3 hikari.py --server
 ## Voice Activation
 
 - **Wake Word**: Say "Hikari" to activate
-- **Codename**: Say "harsha27" for fallback (works when sick, noisy environments)
+- **Codename**: Set your own private fallback in `.env` for sick or noisy environments
 - **Clap Detection**: Double-clap to activate (when enabled)
 
 ## Commands
@@ -79,7 +79,7 @@ python3 hikari.py --server
 - "Remember that I live in Chennai" - Store facts
 - "What do you know about me?" - View profile
 - "What have we talked about?" - Search memory
-- "My name is Mukesh" - HIKARI learns automatically
+- "My name is Alex" - HIKARI learns automatically
 
 ### Health
 - "I'm not feeling well" - Activates sick mode
@@ -156,7 +156,7 @@ brew install portaudio && pip install pyaudio
 ## Pro Tips
 
 1. **Talk to HIKARI naturally** - It learns from every conversation
-2. **Use the codename** when voice isn't working (sick, noisy)
+2. **Use your private codename** when voice isn't working (sick, noisy)
 3. **Ask "what do you know about me"** to see what it's learned
 4. **Say "morning briefing"** for a complete daily update
 5. **Check status** anytime with "status" command
@@ -170,4 +170,4 @@ brew install portaudio && pip install pyaudio
 
 ---
 
-**Built with love for Mukesh. Your personal JARVIS is ready.**
+**Your personal HIKARI assistant is ready.**

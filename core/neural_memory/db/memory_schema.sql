@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS nodes (
     last_accessed TEXT DEFAULT (datetime('now')),
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now')),
-    user_id TEXT DEFAULT 'sanjay',
+    user_id TEXT DEFAULT 'local_user',
     is_archived INTEGER DEFAULT 0,
     is_pinned INTEGER DEFAULT 0,
     UNIQUE(node_type, name, user_id)
@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS edges (
     bidirectional INTEGER DEFAULT 0, -- 1 if same relationship both ways
     last_accessed TEXT DEFAULT (datetime('now')),
     created_at TEXT DEFAULT (datetime('now')),
-    user_id TEXT DEFAULT 'sanjay',
+    user_id TEXT DEFAULT 'local_user',
     is_archived INTEGER DEFAULT 0,
     UNIQUE(source_id, target_id, edge_type, user_id)
 );
@@ -86,7 +86,7 @@ CREATE TABLE IF NOT EXISTS episodes (
     duration_seconds INTEGER,
     started_at TEXT DEFAULT (datetime('now')),
     ended_at TEXT,
-    user_id TEXT DEFAULT 'sanjay',
+    user_id TEXT DEFAULT 'local_user',
     is_archived INTEGER DEFAULT 0
 );
 
@@ -103,7 +103,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     started_at TEXT DEFAULT (datetime('now')),
     ended_at TEXT,
     turn_count INTEGER DEFAULT 0,
-    user_id TEXT DEFAULT 'sanjay',
+    user_id TEXT DEFAULT 'local_user',
     metadata TEXT -- JSON blob
 );
 

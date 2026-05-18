@@ -59,7 +59,8 @@ class VoiceAuth:
 class CodenameAuth:
     """Codename-based authentication fallback"""
 
-    def __init__(self, codename: str = "harsha27"):
+    def __init__(self, codename: str | None = None):
+        codename = codename or os.getenv("CODENAME", "change-me")
         self.codename_hash = hashlib.sha256(codename.encode()).hexdigest()
         self.attempts = 0
         self.max_attempts = 5

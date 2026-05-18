@@ -225,9 +225,10 @@ class HIKARI_Orchestrator:
             return self._get_status_report()
 
         # Codename authentication fallback
-        if lowered == "harsha27" and self.codename_auth.verify(user_input):
+        configured_codename = os.getenv("CODENAME", "change-me").strip().lower()
+        if lowered == configured_codename and self.codename_auth.verify(user_input):
             self.authenticated = True
-            return "Authentication confirmed. I'm ready, Sanjay."
+            return "Authentication confirmed. I'm ready."
 
         # Who am I command
         if any(w in lowered for w in ["who am i", "what do you know about me"]):

@@ -18,7 +18,6 @@ DEFAULT_WHITELIST = [
     str(Path.home() / "Desktop"),
     str(Path.home() / "Downloads"),
     str(Path.home() / "Projects"),
-    str(Path.home() / "PycharmProjects"),
 ]
 
 # Allowed file extensions for reading

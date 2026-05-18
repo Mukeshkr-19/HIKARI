@@ -6,7 +6,7 @@
 
 - **Multi-Agent Swarm** - 6 specialized agents (Voice, Research, Files, System, Code, Memory) working autonomously
 - **Multi-Provider AI Routing** - Smart routing across Google, Groq, OpenRouter, Cerebras, DeepSeek, NVIDIA, Cohere
-- **Voice Authentication** - Voice print + codename fallback (`harsha27`) + clap detection
+- **Voice Authentication** - Voice print + configurable codename fallback + clap detection
 - **Cross-Device** - Laptop as brain, phone/watch as interface via WebSocket + QR pairing
 - **File System Access** - Secure, whitelisted file reading and searching
 - **World Awareness** - Real-time news, weather, time, proactive alerts
@@ -18,7 +18,7 @@
 ### 1. Install Dependencies
 
 ```bash
-cd ~/PycharmProjects/HIKARI
+cd HIKARI
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -72,7 +72,7 @@ python3 hikari.py --port 9000
 ## Voice Activation
 
 - **Wake Word**: Say "Hikari" to activate
-- **Codename**: Say "harsha27" for fallback authentication
+- **Codename**: Set your own private fallback in `.env`
 - **Clap Detection**: Double-clap to activate (when enabled)
 - **Voice Print**: Train your voice for biometric auth (optional)
 

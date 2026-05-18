@@ -53,7 +53,11 @@ class CodenameSystem:
     def _init_default(self):
         """Initialize default codename if none exist"""
         if not self.codenames:
-            self.add_codename("harsha27", "primary", "Main activation codename")
+            self.add_codename(
+                os.getenv("CODENAME", "change-me"),
+                "primary",
+                "Main activation codename",
+            )
 
     def _hash_codename(self, codename: str) -> str:
         """Hash a codename for secure storage"""

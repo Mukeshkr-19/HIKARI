@@ -308,7 +308,9 @@ class MacControl:
     async def screenshot(self, path: str = "") -> str:
         """Take a screenshot"""
         if not path:
-            path = f"/Users/{os.environ.get('USER', 'mukesh')}/Desktop/screenshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+            path = os.path.expanduser(
+                f"~/Desktop/screenshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+            )
 
         result = subprocess.run(["screencapture", "-x", path], capture_output=True)
         return f"Screenshot saved to {path}" if result.returncode == 0 else "Failed to take screenshot"
