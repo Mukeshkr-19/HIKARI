@@ -49,7 +49,7 @@ def run_daemon():
     print("[*] Just speak and I'll respond - no wake word needed!")
     print("[*] Say 'exit' to stop listening\n")
 
-    from hikari_service import HIKARI_Daemon
+    from services.hikari_service import HIKARI_Daemon
     HIKARI_Daemon().run()
 
 def run_tray():
@@ -59,7 +59,7 @@ def run_tray():
 
     try:
         import rumps
-        from hikari_tray import HIKARI_Tray
+        from services.hikari_tray import HIKARI_Tray
         HIKARI_Tray().run()
     except ImportError:
         print("[!] rumps not installed. Install with: pip install rumps")
@@ -71,7 +71,7 @@ def run_server(host: str, port: int):
     print(f"[*] Starting HIKARI server on {host}:{port}...")
 
     from core.orchestrator import get_orchestrator
-    from server import WebSocketServer
+    from core.server import WebSocketServer
 
     orchestrator = get_orchestrator()
     WebSocketServer(orchestrator, host=host, port=port).start()

@@ -39,7 +39,7 @@ hikari/
 │   ├── hikari_service.py   # Main daemon service
 │   └── tray.py             # System tray icon & menu
 ├── hikari.py                 # Main entry point
-└── server.py                 # WebSocket for phone connectivity
+└── core/server.py            # WebSocket for phone connectivity
 ```
 
 ## Features
@@ -92,7 +92,7 @@ pip install -r requirements.txt
 python3 hikari.py
 
 # Or install as service (24/7)
-python3 daemon/hikari_service.py --install
+python3 hikari.py --install
 ```
 
 ## Voice Commands

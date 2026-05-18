@@ -24,4 +24,4 @@ fi
 
 echo "HIKARI: starting... (first load can take ~20s)" >&2
 
-exec "$PY" -E "$REPO_ROOT/src/hikari_cli.py" "$@"
+exec "$PY" -E "$REPO_ROOT/hikari.py" "$@"

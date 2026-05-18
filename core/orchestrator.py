@@ -38,13 +38,13 @@ from core.mac_integration import MacIntegration, get_mac_integration
 from core.task_planner import TaskPlanner, get_task_planner
 from core.build_executor import BuildExecutor, get_build_executor
 from skills.skill_system import SkillRegistry, register_builtin_skills
-from server import WebSocketServer
+from core.server import WebSocketServer
 from security.auth import CodenameAuth
 
 # Import new systems
-from personality import get_personality, get_emotional_iq
-from mac_control import get_mac_control
-from smart_home import get_smart_home
+from core.personality import get_personality, get_emotional_iq
+from core.mac_control import get_mac_control
+from core.smart_home import get_smart_home
 
 # Wake words that activate HIKARI
 WAKE_WORDS = ["hikari", "hey hikari", "okay hikari", "hi hikari"]

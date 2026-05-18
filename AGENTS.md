@@ -13,8 +13,8 @@ Personal AI assistant project with multi-agent architecture and voice capabiliti
 
 ## Key Files
 - `hikari.py` - Main entry point
-- `hikari_daemon.py` - Background daemon
-- `server.py` - API server
+- `services/hikari_daemon.py` - Background daemon
+- `core/server.py` - API server
 - `QUICKSTART.md` - Quick start guide
 
 ## Configuration
@@ -39,5 +39,5 @@ Personal AI assistant project with multi-agent architecture and voice capabiliti
 cd HIKARI
 python hikari.py
 # or
-python server.py
+python hikari.py --server
 ```

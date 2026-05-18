@@ -79,8 +79,8 @@ python3 hikari.py --port 9000
 ### Enroll your voice (speaker verification)
 
 ```bash
-python src/hikari_daemon.py --enroll-voice
-python src/hikari_daemon.py
+python services/hikari_daemon.py --enroll-voice
+python services/hikari_daemon.py
 ```
 
 ## Commands
@@ -123,8 +123,8 @@ hikari/
 ├── config/                  # Configuration files
 ├── data/                    # Runtime data (memory, voice prints)
 ├── hikari-frontend/         # Next.js PWA (optional)
-├── src/server.py            # WebSocket + HTTP server
-├── src/hikari.py            # Main entry point
+├── core/server.py            # WebSocket + HTTP server
+├── hikari.py            # Main entry point
 ├── requirements.txt         # Python dependencies
 └── .env.example             # Environment template
 ```

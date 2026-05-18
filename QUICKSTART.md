@@ -132,8 +132,8 @@ hikari/
 ├── hikari-frontend/   # Next.js PWA for phone
 ├── data/              # Runtime data (auto-created)
 ├── hikari.py          # Main entry point
-├── server.py          # WebSocket + mobile web UI
-└── setup.sh           # One-command setup
+├── core/server.py     # WebSocket + mobile web UI
+└── install.sh           # One-command setup
 ```
 
 ## Troubleshooting

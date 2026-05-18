@@ -3,14 +3,14 @@
 #
 # This installs ONE background listener to avoid multiple daemons fighting over the mic.
 #
-# Default: src/hikari_simple.py (STT-based wake phrase; most reliable setup on fresh Macs).
-# If you want speaker-locked mode, run src/hikari_daemon.py manually or customize this script.
+# Default: services/hikari_simple.py (STT-based wake phrase; most reliable setup on fresh Macs).
+# If you want speaker-locked mode, run services/hikari_daemon.py manually or customize this script.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 PY="$REPO_ROOT/.venv/bin/python"
-DAEMON="$REPO_ROOT/src/hikari_simple.py"
+DAEMON="$REPO_ROOT/services/hikari_simple.py"
 PLIST_DST="$HOME/Library/LaunchAgents/com.hikari.assistant.plist"
 LOG_DIR="$HOME/Library/Logs"
 OUT_LOG="$LOG_DIR/hikari-assistant.stdout.log"

@@ -116,7 +116,7 @@ hikari/
 ├── config/                  # Configuration files
 ├── data/                    # Runtime data (memory, voice prints)
 ├── hikari-frontend/         # Next.js PWA (optional)
-├── server.py                # WebSocket + HTTP server
+├── core/server.py           # WebSocket + HTTP server
 ├── hikari.py                # Main entry point
 ├── requirements.txt         # Python dependencies
 └── .env.example             # Environment template
