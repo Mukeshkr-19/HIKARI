@@ -15,6 +15,7 @@ import sys
 import re
 import argparse
 import subprocess
+from textwrap import dedent
 
 # Hide dock icon when running as service
 if "--daemon" in sys.argv or "--bg" in sys.argv or "--tray" in sys.argv:
@@ -29,10 +30,28 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 os.environ["OBJC_DISABLE_INITIALIZE_BRIDGE"] = "1"
 
 def print_banner():
-    print("""\
-HIKARI
-Local AI assistant
-""")
+    banner = dedent(
+        """
+        +--------------------------------------------------------------------------+
+        |                                                                          |
+        |   H   H  III  K   K    A    RRRR   III                                  |
+        |   H   H   I   K  K    A A   R   R   I                                   |
+        |   HHHHH   I   KKK    AAAAA  RRRR    I                                   |
+        |   H   H   I   K  K   A   A  R  R    I                                   |
+        |   H   H  III  K   K  A   A  R   R  III                                  |
+        |                                                                          |
+        |                 Your 24/7 AI Assistant - Always Listening                |
+        |                                                                          |
+        +--------------------------------------------------------------------------+
+        """
+    ).strip("\n")
+
+    if sys.stdout.isatty() and os.environ.get("NO_COLOR") is None:
+        green = "\033[92m"
+        reset = "\033[0m"
+        print(f"{green}{banner}{reset}\n")
+    else:
+        print(f"{banner}\n")
 
 def run_daemon():
     """Run as always-listening service (no wake word needed)"""
