@@ -36,29 +36,17 @@ fi
 
 chmod +x bin/Hikari 2>/dev/null || true
 chmod +x "$REPO_ROOT/scripts/install-hikari-login-agent.sh" \
-  "$REPO_ROOT/scripts/uninstall-hikari-login-agent.sh" 2>/dev/null || true
+  "$REPO_ROOT/scripts/uninstall-hikari-login-agent.sh" \
+  "$REPO_ROOT/scripts/install-hikari-cli.sh" \
+  "$REPO_ROOT/scripts/uninstall-hikari-cli.sh" 2>/dev/null || true
 
-# Optional: global command — type Hikari from any directory
-HB="$HOME/bin"
-mkdir -p "$HB"
-ln -sf "$REPO_ROOT/bin/Hikari" "$HB/Hikari"
-ln -sf "$REPO_ROOT/bin/Hikari" "$HB/hikari"
-if [[ ":$PATH:" != *":$HB:"* ]]; then
-  echo ""
-  echo "To run Hikari from anywhere, add this line to ~/.zshrc (or ~/.bashrc):"
-  echo "  export PATH=\"\$HOME/bin:\$PATH\""
-  echo ""
-  echo "Then restart the terminal or:  export PATH=\"\$HOME/bin:\$PATH\""
-fi
+"$REPO_ROOT/scripts/install-hikari-cli.sh"
 
 echo ""
 echo "=== Done ==="
 echo "Activate the environment:"
 echo "  source .venv/bin/activate"
 echo ""
-echo "CLI from repo folder:"
-echo "  ./bin/Hikari"
-echo ""
-echo "After PATH includes \$HOME/bin:"
-echo "  Hikari"
+echo "CLI from anywhere:"
+echo "  hikari --doctor"
 echo ""

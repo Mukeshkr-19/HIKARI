@@ -7,6 +7,7 @@ Usage:
     python3 hikari.py --daemon        # Always listening (no wake word needed)
     python3 hikari.py --tray          # System tray icon mode
     python3 hikari.py --install       # Install as login item (starts on boot)
+    python3 hikari.py --install-cli   # Install hikari/Hikari shell commands
 """
 
 import os
@@ -141,6 +142,11 @@ def install_service():
     print("[+] HIKARI installed as login item!")
     print("[+] Restart your Mac to start HIKARI automatically.")
 
+def run_repo_script(script_name: str):
+    """Run a repo-local script."""
+    script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts", script_name)
+    raise SystemExit(subprocess.run(["bash", script_path]).returncode)
+
 def main():
     parser = argparse.ArgumentParser(
         description="HIKARI personal AI assistant",
@@ -184,6 +190,16 @@ def main():
         help="Install HIKARI as a macOS login item.",
     )
     parser.add_argument(
+        "--install-cli",
+        action="store_true",
+        help="Install hikari/Hikari shell commands into a PATH directory.",
+    )
+    parser.add_argument(
+        "--uninstall-cli",
+        action="store_true",
+        help="Remove hikari/Hikari shell commands installed for this repo.",
+    )
+    parser.add_argument(
         "--doctor",
         action="store_true",
         help="Run a quick HIKARI workspace health/status check.",
@@ -204,6 +220,12 @@ def main():
     if args.install:
         install_service()
         return
+
+    if args.install_cli:
+        run_repo_script("install-hikari-cli.sh")
+
+    if args.uninstall_cli:
+        run_repo_script("uninstall-hikari-cli.sh")
 
     if args.tray:
         run_tray()

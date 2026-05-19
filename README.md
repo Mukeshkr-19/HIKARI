@@ -75,11 +75,23 @@ cd /Users/mukeshkrishnamurthy/Documents/HIKARI-projects/HIKARI
 .venv/bin/python -m pip install --upgrade pip wheel setuptools
 .venv/bin/python -m pip install -r requirements.txt -r requirements-dev.txt
 cp .env.example .env
+bash scripts/install-hikari-cli.sh
 ```
 
 Edit `.env` and add at least one provider key, for example `GOOGLE_AI_STUDIO_KEY` or `GROQ_API_KEY`.
 
 ## Run
+
+After CLI install, `hikari` and `Hikari` work from any terminal folder:
+
+```bash
+hikari --help
+hikari --doctor
+hikari --text
+hikari --server --host 127.0.0.1 --port 9876
+```
+
+Repo-local commands still work too:
 
 ```bash
 cd /Users/mukeshkrishnamurthy/Documents/HIKARI-projects/HIKARI
@@ -107,6 +119,16 @@ cd /Users/mukeshkrishnamurthy/Documents/HIKARI-projects/HIKARI
 .venv/bin/python services/hikari_daemon.py
 ```
 
+CLI install/uninstall:
+
+```bash
+bash scripts/install-hikari-cli.sh
+bash scripts/uninstall-hikari-cli.sh
+# or
+.venv/bin/python hikari.py --install-cli
+.venv/bin/python hikari.py --uninstall-cli
+```
+
 Phone/server URLs when server mode is running:
 
 ```text
@@ -131,8 +153,8 @@ The frontend must not depend on remote Google Fonts during build. Keep fonts loc
 cd /Users/mukeshkrishnamurthy/Documents/HIKARI-projects/HIKARI
 
 git status --short --branch
-.venv/bin/python hikari.py --help
-.venv/bin/python hikari.py --doctor
+hikari --help
+hikari --doctor
 printf 'status\nexit\n' | .venv/bin/python hikari.py --text
 .venv/bin/python -m pytest tests -q
 cd hikari-frontend && npm run lint && npm run build

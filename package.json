@@ -12,6 +12,8 @@
     "enroll": "bash -c 'test -d .venv && . .venv/bin/activate; exec python services/hikari_daemon.py --enroll-voice'",
     "doctor": "bash scripts/doctor.sh",
     "doctor:full": "bash scripts/doctor.sh --full",
+    "cli-install": "bash scripts/install-hikari-cli.sh",
+    "cli-uninstall": "bash scripts/uninstall-hikari-cli.sh",
     "login-agent": "bash scripts/install-hikari-login-agent.sh",
     "login-agent-uninstall": "bash scripts/uninstall-hikari-login-agent.sh"
   },

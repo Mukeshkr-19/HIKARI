@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# HIKARI launcher — ~/bin/Hikari → this file. Clears Conda PYTHONHOME before any python call.
+# HIKARI launcher. Install links as hikari/Hikari in a PATH directory.
 set -euo pipefail
 
 unset PYTHONHOME
@@ -22,6 +22,12 @@ if [[ ! -x "$PY" ]]; then
   exit 1
 fi
 
-echo "HIKARI: starting... (first load can take ~20s)" >&2
+case "${1:-}" in
+  -h|--help|--doctor|--doctor-full|--install-cli|--uninstall-cli)
+    ;;
+  *)
+    echo "HIKARI: starting... (first load can take ~20s)" >&2
+    ;;
+esac
 
 exec "$PY" -E "$REPO_ROOT/hikari.py" "$@"

@@ -16,6 +16,7 @@ The project should use Python 3.12. Avoid creating the venv with Python 3.14.
 /Library/Frameworks/Python.framework/Versions/3.12/bin/python3.12 -m venv .venv
 .venv/bin/python -m pip install --upgrade pip wheel setuptools
 .venv/bin/python -m pip install -r requirements.txt -r requirements-dev.txt
+bash scripts/install-hikari-cli.sh
 ```
 
 ## 3. Configure API Keys
@@ -35,6 +36,17 @@ Keep real keys local. Never commit `.env`.
 
 ## 4. Run HIKARI
 
+After CLI install, this works from any terminal folder:
+
+```bash
+hikari --help
+hikari --doctor
+hikari --text
+hikari --server --host 127.0.0.1 --port 9876
+```
+
+Repo-local commands still work:
+
 ```bash
 # See all supported options
 .venv/bin/python hikari.py --help
@@ -48,6 +60,10 @@ Keep real keys local. Never commit `.env`.
 # Same checks through the helper script
 bash scripts/doctor.sh
 bash scripts/doctor.sh --full
+
+# Install or remove global hikari/Hikari shell commands
+bash scripts/install-hikari-cli.sh
+bash scripts/uninstall-hikari-cli.sh
 
 # Text mode, safest first test
 .venv/bin/python hikari.py --text
@@ -95,8 +111,8 @@ npm run build
 ```bash
 cd /Users/mukeshkrishnamurthy/Documents/HIKARI-projects/HIKARI
 git status --short --branch
-.venv/bin/python hikari.py --help
-.venv/bin/python hikari.py --doctor
+hikari --help
+hikari --doctor
 printf 'status\nexit\n' | .venv/bin/python hikari.py --text
 .venv/bin/python -m pytest tests -q
 ```
