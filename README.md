@@ -81,6 +81,12 @@ cd /Users/mukeshkrishnamurthy/Documents/HIKARI-projects/HIKARI
 # CLI help
 .venv/bin/python hikari.py --help
 
+# Quick health/status check
+.venv/bin/python hikari.py --doctor
+
+# Full pre-push health check
+.venv/bin/python hikari.py --doctor-full
+
 # Text mode
 .venv/bin/python hikari.py --text
 
@@ -120,10 +126,26 @@ cd /Users/mukeshkrishnamurthy/Documents/HIKARI-projects/HIKARI
 
 git status --short --branch
 .venv/bin/python hikari.py --help
+.venv/bin/python hikari.py --doctor
 printf 'status\nexit\n' | .venv/bin/python hikari.py --text
 .venv/bin/python -m pytest tests -q
 cd hikari-frontend && npm run lint && npm run build
 ```
+
+Full doctor/status check:
+
+```bash
+.venv/bin/python hikari.py --doctor-full
+# or
+npm run doctor:full
+# or
+bash scripts/doctor.sh --full
+```
+
+Quick doctor checks repo layout, Git cleanliness, Python version, private brain paths,
+public Git privacy, duplicate tracked content, and frontend dependency presence.
+Full doctor additionally runs CLI help, text status, Python tests, frontend lint,
+and frontend build.
 
 Private-file scan before any public push:
 
@@ -149,7 +171,6 @@ That command should return nothing.
 
 1. Keep the current baseline stable.
 2. Keep public code in GitHub and private memory/docs outside GitHub.
-3. Add a real doctor/status command surface.
-4. Make voice mode reliable and easier to test.
-5. Improve neural memory quality with backup-first cleanup tools.
-6. Add Obsidian as an export/readable layer, not as the source of truth.
+3. Make voice mode reliable and easier to test.
+4. Improve neural memory quality with backup-first cleanup tools.
+5. Add Obsidian as an export/readable layer, not as the source of truth.

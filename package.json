@@ -10,6 +10,8 @@
     "server": "bash -c 'test -d .venv && . .venv/bin/activate; exec python hikari.py --server'",
     "daemon": "bash -c 'test -d .venv && . .venv/bin/activate; exec python services/hikari_daemon.py'",
     "enroll": "bash -c 'test -d .venv && . .venv/bin/activate; exec python services/hikari_daemon.py --enroll-voice'",
+    "doctor": "bash scripts/doctor.sh",
+    "doctor:full": "bash scripts/doctor.sh --full",
     "login-agent": "bash scripts/install-hikari-login-agent.sh",
     "login-agent-uninstall": "bash scripts/uninstall-hikari-login-agent.sh"
   },

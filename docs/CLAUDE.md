@@ -77,6 +77,8 @@ which points to:
 cd /Users/mukeshkrishnamurthy/Documents/HIKARI-projects/HIKARI
 
 .venv/bin/python hikari.py --help
+.venv/bin/python hikari.py --doctor
+.venv/bin/python hikari.py --doctor-full
 .venv/bin/python hikari.py --text
 .venv/bin/python hikari.py --server --host 127.0.0.1 --port 9876
 .venv/bin/python hikari.py --daemon
@@ -103,6 +105,7 @@ npm run build
 
 - `pytest tests -q` passes.
 - `hikari.py --help` works.
+- `hikari.py --doctor` works.
 - text mode status works.
 - server `/api/status` works.
 - frontend lint/build passes.

@@ -39,6 +39,16 @@ Keep real keys local. Never commit `.env`.
 # See all supported options
 .venv/bin/python hikari.py --help
 
+# Quick health/status check
+.venv/bin/python hikari.py --doctor
+
+# Full pre-push health check
+.venv/bin/python hikari.py --doctor-full
+
+# Same checks through the helper script
+bash scripts/doctor.sh
+bash scripts/doctor.sh --full
+
 # Text mode, safest first test
 .venv/bin/python hikari.py --text
 
@@ -86,6 +96,7 @@ npm run build
 cd /Users/mukeshkrishnamurthy/Documents/HIKARI-projects/HIKARI
 git status --short --branch
 .venv/bin/python hikari.py --help
+.venv/bin/python hikari.py --doctor
 printf 'status\nexit\n' | .venv/bin/python hikari.py --text
 .venv/bin/python -m pytest tests -q
 ```
@@ -94,6 +105,7 @@ Expected baseline:
 
 - Git branch tracks `mukeshkr19/main`.
 - CLI help works.
+- Doctor quick check works.
 - Text `status` works.
 - Neural memory connects when run outside a restricted sandbox.
 - Tests pass.
@@ -123,6 +135,5 @@ Compatibility symlink:
 
 1. Run the health check.
 2. Fix docs or command drift before feature work.
-3. Add a doctor/status command surface.
-4. Improve one layer at a time: CLI, server, UI, voice, neural memory.
-5. Back up the brain before any memory cleanup.
+3. Improve one layer at a time: CLI, server, UI, voice, neural memory.
+4. Back up the brain before any memory cleanup.

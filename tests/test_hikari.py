@@ -285,5 +285,48 @@ class TestOrchestrator(unittest.TestCase):
         self.assertTrue(orch.authenticated)
 
 
+class TestDoctor(unittest.TestCase):
+    """Test the doctor/status checker."""
+
+    def test_private_match_detection(self):
+        from core.doctor import _tracked_private_matches
+
+        matches = _tracked_private_matches(
+            [
+                "README.md",
+                ".env",
+                "data/voice_auth.json",
+                "docs/WORK_DONE.md",
+            ]
+        )
+
+        self.assertEqual(matches, [".env", "data/voice_auth.json", "docs/WORK_DONE.md"])
+
+    def test_format_checks(self):
+        from core.doctor import Check, format_checks
+
+        output = format_checks(
+            [
+                Check("One", "ok", "good"),
+                Check("Two", "warn", "careful"),
+            ]
+        )
+
+        self.assertIn("[OK] One: good", output)
+        self.assertIn("[WARN] Two: careful", output)
+        self.assertIn("OK WITH WARNINGS", output)
+
+    def test_collect_quick_checks(self):
+        from core.doctor import collect_checks
+
+        checks = collect_checks(full=False)
+        names = {check.name for check in checks}
+
+        self.assertIn("Python version", names)
+        self.assertIn("Git status", names)
+        self.assertIn("Public Git privacy scan", names)
+        self.assertIn("Tracked duplicate scan", names)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

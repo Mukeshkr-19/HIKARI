@@ -183,8 +183,23 @@ def main():
         action="store_true",
         help="Install HIKARI as a macOS login item.",
     )
+    parser.add_argument(
+        "--doctor",
+        action="store_true",
+        help="Run a quick HIKARI workspace health/status check.",
+    )
+    parser.add_argument(
+        "--doctor-full",
+        action="store_true",
+        help="Run doctor plus CLI, text, test, lint, and build checks.",
+    )
 
     args = parser.parse_args()
+
+    if args.doctor or args.doctor_full:
+        from core.doctor import run_doctor
+
+        raise SystemExit(run_doctor(full=args.doctor_full))
 
     if args.install:
         install_service()
