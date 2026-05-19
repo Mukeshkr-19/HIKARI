@@ -43,6 +43,7 @@ hikari --help
 hikari --doctor
 hikari --text
 hikari --server --host 127.0.0.1 --port 9876
+hikari --text --verbose
 ```
 
 Repo-local commands still work:
@@ -76,6 +77,7 @@ bash scripts/uninstall-hikari-cli.sh
 ```
 
 There is currently no `hikari.py --voice` option. Use `--daemon` for the simple voice service, or use `services/hikari_daemon.py` for the speaker-locked daemon.
+Normal text mode hides internal startup and routing logs. Add `--verbose` only when debugging.
 
 ## 5. Speaker-Locked Voice Daemon
 

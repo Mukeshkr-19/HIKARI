@@ -89,6 +89,7 @@ hikari --help
 hikari --doctor
 hikari --text
 hikari --server --host 127.0.0.1 --port 9876
+hikari --text --verbose
 ```
 
 Repo-local commands still work too:
@@ -174,6 +175,9 @@ Quick doctor checks repo layout, Git cleanliness, Python version, private brain 
 public Git privacy, duplicate tracked content, and frontend dependency presence.
 Full doctor additionally runs CLI help, text status, Python tests, frontend lint,
 and frontend build.
+
+Normal CLI chat is quiet by default. Use `--verbose` when you want internal
+initialization, routing, scheduler, memory, and provider logs.
 
 Private-file scan before any public push:
 

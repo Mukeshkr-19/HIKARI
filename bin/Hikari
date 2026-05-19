@@ -22,12 +22,4 @@ if [[ ! -x "$PY" ]]; then
   exit 1
 fi
 
-case "${1:-}" in
-  -h|--help|--doctor|--doctor-full|--install-cli|--uninstall-cli)
-    ;;
-  *)
-    echo "HIKARI: starting... (first load can take ~20s)" >&2
-    ;;
-esac
-
 exec "$PY" -E "$REPO_ROOT/hikari.py" "$@"

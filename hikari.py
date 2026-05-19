@@ -29,20 +29,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 os.environ["OBJC_DISABLE_INITIALIZE_BRIDGE"] = "1"
 
 def print_banner():
-    print("""
-╔══════════════════════════════════════════════════════════╗
-║                                                          ║
-║   ██╗  ██╗██╗  ██╗ ██████╗ ██╗    ██╗                    ║
-║   ██║ ██╔╝██║  ██║██╔═══██╗██║    ██║                    ║
-║   █████╔╝ ███████║██║   ██║██║ █╗ ██║                    ║
-║   ██╔═██╗ ██╔══██║██║   ██║██║███╗██║                    ║
-║   ██║  ██╗██║  ██║╚██████╔╝╚███╔███╔╝                    ║
-║   ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝  ╚══╝╚══╝                    ║
-║                                                          ║
-║         Your 24/7 AI Assistant - Always Listening          ║
-║                                                          ║
-╚══════════════════════════════════════════════════════════╝
-    """)
+    print("""\
+HIKARI
+Local AI assistant
+""")
 
 def run_daemon():
     """Run as always-listening service (no wake word needed)"""
@@ -85,9 +75,7 @@ def run_interactive():
 
     orchestrator = get_orchestrator()
 
-    print("  Ready! Just type and press Enter.")
-    print("  Say 'exit' to quit.\n")
-    print("=" * 60 + "\n")
+    print("Ready. Type a message, or 'exit' to quit.\n")
 
     while True:
         try:
@@ -96,7 +84,7 @@ def run_interactive():
                 continue
 
             if user_input.lower() in ["exit", "quit", "bye"]:
-                print("\n[HIKARI] Goodbye!")
+                print("\nHIKARI: Goodbye.")
                 break
 
             response = orchestrator.process_input(user_input, source="text")
@@ -104,7 +92,7 @@ def run_interactive():
                 print(f"\nHIKARI: {response}\n")
 
         except KeyboardInterrupt:
-            print("\n[HIKARI] Shutting down...")
+            print("\nHIKARI: Shutting down.")
             break
         except EOFError:
             break
@@ -209,8 +197,17 @@ def main():
         action="store_true",
         help="Run doctor plus CLI, text, test, lint, and build checks.",
     )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Show internal initialization, routing, scheduler, and memory logs.",
+    )
 
     args = parser.parse_args()
+
+    if args.verbose:
+        os.environ["HIKARI_VERBOSE"] = "1"
+        os.environ["HIKARI_QUIET"] = "0"
 
     if args.doctor or args.doctor_full:
         from core.doctor import run_doctor

@@ -11,6 +11,8 @@ from typing import Optional, Dict, Any, List, Callable
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from core.quiet import debug
+
 DATA_DIR = Path(__file__).parent.parent / "data"
 SCHEDULES_FILE = DATA_DIR / "schedules.json"
 
@@ -42,7 +44,7 @@ class ScheduledTask:
             self.run_count += 1
             return result
         except Exception as e:
-            print(f"[SCHEDULER] Error in task '{self.name}': {e}")
+            debug(f"[SCHEDULER] Error in task '{self.name}': {e}")
             self.next_run = time.time() + 60  # Retry in 1 minute
 
     def get_status(self) -> Dict[str, Any]:
@@ -86,7 +88,7 @@ class AlertRule:
                 self.last_triggered = time.time()
                 return result
         except Exception as e:
-            print(f"[ALERT] Error in rule '{self.name}': {e}")
+            debug(f"[ALERT] Error in rule '{self.name}': {e}")
         return None
 
 
@@ -127,7 +129,7 @@ class Scheduler:
             with open(SCHEDULES_FILE, "w") as f:
                 json.dump(data, f, indent=2)
         except Exception as e:
-            print(f"[SCHEDULER] Save error: {e}")
+            debug(f"[SCHEDULER] Save error: {e}")
 
     def add_task(
         self, name: str, interval_seconds: int, callback: Callable
@@ -135,7 +137,7 @@ class Scheduler:
         """Add a recurring task"""
         task = ScheduledTask(name, interval_seconds, callback)
         self.tasks.append(task)
-        print(f"[SCHEDULER] Added task: {name} (every {interval_seconds}s)")
+        debug(f"[SCHEDULER] Added task: {name} (every {interval_seconds}s)")
         return task
 
     def add_alert(
@@ -148,20 +150,20 @@ class Scheduler:
         """Add a conditional alert rule"""
         alert = AlertRule(name, condition, action, cooldown)
         self.alerts.append(alert)
-        print(f"[SCHEDULER] Added alert: {name}")
+        debug(f"[SCHEDULER] Added alert: {name}")
 
     def start(self):
         """Start the scheduler loop"""
         self._running = True
         self._thread = threading.Thread(target=self._loop, daemon=True)
         self._thread.start()
-        print("[SCHEDULER] Started")
+        debug("[SCHEDULER] Started")
 
     def stop(self):
         self._running = False
         if self._thread:
             self._thread.join(timeout=5)
-        print("[SCHEDULER] Stopped")
+        debug("[SCHEDULER] Stopped")
 
     def _loop(self):
         while self._running:
@@ -183,7 +185,7 @@ class Scheduler:
                 time.sleep(1)
 
             except Exception as e:
-                print(f"[SCHEDULER] Loop error: {e}")
+                debug(f"[SCHEDULER] Loop error: {e}")
                 time.sleep(5)
 
     def _add_notification(self, type: str, source: str, message: str):

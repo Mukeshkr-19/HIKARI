@@ -40,6 +40,7 @@ from core.build_executor import BuildExecutor, get_build_executor
 from skills.skill_system import SkillRegistry, register_builtin_skills
 from core.server import WebSocketServer
 from security.auth import CodenameAuth
+from core.quiet import debug
 
 # Import new systems
 from core.personality import get_personality, get_emotional_iq
@@ -54,7 +55,7 @@ class HIKARI_Orchestrator:
     """Central brain of HIKARI - coordinates everything"""
 
     def __init__(self):
-        print("[HIKARI] Initializing brain...")
+        debug("[HIKARI] Initializing brain...")
         self.authenticated = False
         self.codename_auth = CodenameAuth()
 
@@ -106,9 +107,9 @@ class HIKARI_Orchestrator:
 
         self._init_neural_memory()
 
-        print("[HIKARI] Brain initialized!")
-        print("[HIKARI] Memory:", len(self.memory.conversations), "conversations")
-        print("[HIKARI] Personality traits:", self.personality.traits)
+        debug("[HIKARI] Brain initialized!")
+        debug("[HIKARI] Memory:", len(self.memory.conversations), "conversations")
+        debug("[HIKARI] Personality traits:", self.personality.traits)
 
     def _init_neural_memory(self):
         """Initialize optional SQLite neural memory in ~/.hikari/brain."""
@@ -118,13 +119,13 @@ class HIKARI_Orchestrator:
             if neural_memory_bridge.init_neural_memory():
                 self.neural_memory = neural_memory_bridge
                 self.neural_memory_enabled = True
-                print("[HIKARI] Neural memory connected")
+                debug("[HIKARI] Neural memory connected")
             else:
-                print("[HIKARI] Neural memory unavailable")
+                debug("[HIKARI] Neural memory unavailable")
         except Exception as e:
             self.neural_memory = None
             self.neural_memory_enabled = False
-            print(f"[HIKARI] Neural memory skipped: {e}")
+            debug(f"[HIKARI] Neural memory skipped: {e}")
 
     def _init_agents(self):
         """Initialize all agents"""
@@ -135,12 +136,12 @@ class HIKARI_Orchestrator:
         self.agents["code"] = CodeAgent()
         self.agents["memory"] = MemoryAgent(self.memory)
 
-        print(f"[HIKARI] Initialized {len(self.agents)} agents")
+        debug(f"[HIKARI] Initialized {len(self.agents)} agents")
 
     def _init_skills(self):
         """Initialize built-in skills"""
         register_builtin_skills(self.skill_registry)
-        print(f"[HIKARI] Registered {len(self.skill_registry.skills)} skills")
+        debug(f"[HIKARI] Registered {len(self.skill_registry.skills)} skills")
 
     def _init_scheduler(self):
         """Initialize proactive scheduler"""
@@ -148,14 +149,14 @@ class HIKARI_Orchestrator:
             self.scheduler = setup_default_scheduler(self)
             self.scheduler.start()
         except Exception as e:
-            print(f"[HIKARI] Scheduler init failed: {e}")
+            debug(f"[HIKARI] Scheduler init failed: {e}")
 
     def process_input(self, user_input: str, source: str = "text") -> Optional[str]:
         """Main entry point - process any user input"""
         if not user_input or not user_input.strip():
             return None
 
-        print(f"\n[INPUT] ({source}): {user_input}")
+        debug(f"\n[INPUT] ({source}): {user_input}")
 
         # Handle special commands
         response = self._handle_special_commands(user_input)
@@ -208,7 +209,7 @@ class HIKARI_Orchestrator:
             try:
                 self.neural_memory.remember(user_input, response or "", {"source": source})
             except Exception as e:
-                print(f"[MEMORY] Neural remember failed: {e}")
+                debug(f"[MEMORY] Neural remember failed: {e}")
 
         return response
 
@@ -254,7 +255,7 @@ class HIKARI_Orchestrator:
         for name, agent in self.agents.items():
             scores[name] = agent.can_handle(user_input)
 
-        print(f"[ROUTE] Agent scores: {scores}")
+        debug(f"[ROUTE] Agent scores: {scores}")
 
         best_agent = max(scores, key=scores.get)
         best_score = scores[best_agent]
@@ -271,7 +272,7 @@ class HIKARI_Orchestrator:
                 return None
             return response
         except Exception as e:
-            print(f"[ROUTE] Agent error: {e}")
+            debug(f"[ROUTE] Agent error: {e}")
             return None
 
     def _get_ai_response(self, user_input: str, emotion: str = "neutral", emotion_score: float = 0.0) -> str:
@@ -287,7 +288,7 @@ class HIKARI_Orchestrator:
                 if memory_context:
                     context += f"{memory_context}\n\n"
             except Exception as e:
-                print(f"[MEMORY] Neural recall failed: {e}")
+                debug(f"[MEMORY] Neural recall failed: {e}")
 
         # Add emotion context
         if emotion != "neutral" and emotion_score > 0.4:
@@ -311,7 +312,7 @@ class HIKARI_Orchestrator:
             )
             return response if response else "I'm having trouble thinking right now."
         except Exception as e:
-            print(f"[AI] Error: {e}")
+            debug(f"[AI] Error: {e}")
             return "I'm having trouble thinking right now. Try again in a moment."
 
     def _check_health(self, text: str):
@@ -356,7 +357,7 @@ Mood: {self.emotional_iq.current_mood}
             try:
                 return self.neural_memory.format_whoami()
             except Exception as e:
-                print(f"[MEMORY] Neural whoami failed: {e}")
+                debug(f"[MEMORY] Neural whoami failed: {e}")
 
         name = self.personality.user_prefs.get("name") or self.user_profile.name or "you"
         prefs = self.personality.user_prefs

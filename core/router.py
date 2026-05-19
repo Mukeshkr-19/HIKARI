@@ -8,12 +8,18 @@ import os
 import time
 import random
 import hashlib
+import logging
 from typing import Optional, Dict, Any, Tuple
 from dataclasses import dataclass, field
 from collections import defaultdict
 from dotenv import load_dotenv
 
 from core.quiet import is_quiet
+
+if is_quiet():
+    for logger_name in ("LiteLLM", "litellm"):
+        logging.getLogger(logger_name).setLevel(logging.ERROR)
+        logging.getLogger(logger_name).disabled = True
 
 try:
     import litellm

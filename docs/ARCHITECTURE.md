@@ -93,6 +93,7 @@ After CLI install, these global shell commands work from any directory:
 ```bash
 hikari --doctor
 Hikari --doctor
+hikari --text --verbose
 ```
 
 Speaker-locked daemon:

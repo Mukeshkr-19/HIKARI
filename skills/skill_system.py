@@ -7,6 +7,8 @@ from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 
+from core.quiet import debug
+
 
 class Skill(ABC):
     """Base class for all skills"""
@@ -54,13 +56,13 @@ class SkillRegistry:
     def register(self, skill: Skill):
         """Register a skill"""
         self.skills[skill.name] = skill
-        print(f"[SKILL] Registered: {skill.name} v{skill.version}")
+        debug(f"[SKILL] Registered: {skill.name} v{skill.version}")
 
     def unregister(self, name: str):
         """Unregister a skill"""
         if name in self.skills:
             del self.skills[name]
-            print(f"[SKILL] Unregistered: {name}")
+            debug(f"[SKILL] Unregistered: {name}")
 
     def find_best_skill(self, user_input: str) -> Optional[Skill]:
         """Find the best skill for the input"""
