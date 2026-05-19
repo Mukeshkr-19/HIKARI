@@ -39,6 +39,12 @@ HIKARI/
 └── requirements.txt
 ```
 
+## Public Docs
+
+- `docs/QUICKSTART.md` - setup and first-run commands.
+- `docs/ARCHITECTURE.md` - current repo layout, commands, and operating model.
+- `docs/NEURAL_MEMORY_ACCEPTANCE.md` - neural memory acceptance criteria.
+
 ## Private Local Layout
 
 These are intentionally not in GitHub:
