@@ -1,177 +1,128 @@
-# HIKARI v2.0 - Quick Start Guide
+# HIKARI Quick Start
 
-## Your Personal JARVIS is Ready
+This guide matches the current repo layout as of May 19, 2026.
 
-HIKARI v2.0 is a fully autonomous, multi-agent AI assistant that:
-- **Knows you** - Learns your voice, habits, preferences, relationships
-- **Anticipates needs** - Proactive suggestions based on your patterns
-- **Adapts to you** - Evolves personality, detects emotions, supports when sick
-- **Works everywhere** - Laptop brain + phone/watch interface
-- **Remembers everything** - Semantic memory with deep context retrieval
-
-## Setup (5 minutes)
-
-### 1. Get API Keys (at least one)
-
-**Recommended: Google AI Studio** (best free tier, 1M context)
-- Go to: https://aistudio.google.com/app/apikey
-- Click "Create API Key"
-- Copy the key
-
-**Alternative: Groq** (fastest, 300+ tokens/sec)
-- Go to: https://console.groq.com/keys
-- Create API key
-
-### 2. Configure
+## 1. Go To The Repo
 
 ```bash
-cd HIKARI
-source .venv/bin/activate
+cd /Users/mukeshkrishnamurthy/Documents/HIKARI-projects/HIKARI
+```
 
-# Edit .env file
-nano .env  # or use any editor
+## 2. Use Python 3.12
 
-# Add your API key(s):
+The project should use Python 3.12. Avoid creating the venv with Python 3.14.
+
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3.12 -m venv .venv
+.venv/bin/python -m pip install --upgrade pip wheel setuptools
+.venv/bin/python -m pip install -r requirements.txt -r requirements-dev.txt
+```
+
+## 3. Configure API Keys
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` and add at least one key:
+
+```text
 GOOGLE_AI_STUDIO_KEY=your-key-here
-# GROQ_API_KEY=your-key-here
+GROQ_API_KEY=your-key-here
 ```
 
-### 3. Run
+Keep real keys local. Never commit `.env`.
+
+## 4. Run HIKARI
 
 ```bash
-# Text mode (easiest to start)
-python3 hikari.py --text
+# See all supported options
+.venv/bin/python hikari.py --help
 
-# Voice mode (wake-word gated, speaker-locked if enrolled)
-python3 hikari.py --voice
+# Text mode, safest first test
+.venv/bin/python hikari.py --text
 
-# Server only (for phone connections)
-python3 hikari.py --server
+# Server mode for phone/browser connection
+.venv/bin/python hikari.py --server --host 127.0.0.1 --port 9876
+
+# Simple always-listening daemon
+.venv/bin/python hikari.py --daemon
 ```
 
-## Phone Connection
+There is currently no `hikari.py --voice` option. Use `--daemon` for the simple voice service, or use `services/hikari_daemon.py` for the speaker-locked daemon.
 
-1. Start HIKARI on laptop
-2. Note the IP shown: `http://192.168.x.x:8765/connect`
-3. Open that URL on your phone's browser
-4. Enter the 6-digit pairing code
-5. Done! Your phone is now connected to HIKARI
-
-**Or scan the QR code:** `http://192.168.x.x:8765/qr`
-
-## Voice Activation
-
-- **Wake Word**: Say "Hikari" to activate
-- **Speaker lock (recommended)**: enroll once so only you can activate
+## 5. Speaker-Locked Voice Daemon
 
 ```bash
-python3 hikari_daemon.py --enroll-voice
-python3 hikari_daemon.py
+.venv/bin/python services/hikari_daemon.py --enroll-voice
+.venv/bin/python services/hikari_daemon.py
 ```
 
-## Commands
+Speaker enrollment stores local voice-auth data under ignored runtime paths. Do not push it.
 
-### Basic
-- "What's the weather?" - Weather info
-- "Open Safari" - Launch apps
-- "Open YouTube" - Open websites
-- "What time is it?" - Current time
-- "What's the news?" - Latest headlines
-- "Morning briefing" - Full daily update
+## 6. Phone Connection
 
-### Memory & Learning
-- "Remember that I live in Chennai" - Store facts
-- "What do you know about me?" - View profile
-- "What have we talked about?" - Search memory
-- "My name is Alex" - HIKARI learns automatically
+Start server mode, then open:
 
-### Health
-- "I'm not feeling well" - Activates sick mode
-- HIKARI automatically detects when you're sick
-- Lowers voice sensitivity, provides support
-- Tracks health episodes over time
-
-### System
-- "Status" - Full system report
-- "Exit" / "Goodbye" - Shut down
-
-## What HIKARI Learns About You
-
-1. **Voice** - Stores voice patterns, adapts when sick
-2. **Name & Location** - From conversations
-3. **Preferences** - Tools, apps, communication style
-4. **Relationships** - People you mention
-5. **Projects & Interests** - What you work on
-6. **Daily Patterns** - When you do things
-7. **Emotions** - Mood tracking and support
-8. **Health** - Sick episodes, recovery tracking
-
-## Intelligence Systems (24 Total)
-
-| System | What It Does |
-|--------|-------------|
-| AI Router | Routes to best AI provider (Google, Groq, OpenRouter, etc.) |
-| Voice Memory | Learns your voice, adapts when sick |
-| User Profile | Learns habits, preferences, relationships |
-| Emotional IQ | Detects mood, adapts responses |
-| Proactive Intel | Anticipates needs, suggests actions |
-| Knowledge Graph | Maps your world (people, projects, interests) |
-| Adaptive Personality | Evolves communication style with you |
-| Health Awareness | Detects sickness, provides support |
-| Semantic Memory | Deep conversation search and context |
-| Scheduler | Proactive alerts, scheduled tasks |
-| Codename System | Multi-codename, context-aware auth |
-| Skill System | Extensible capabilities |
-| 6 Agents | Voice, Research, Files, System, Code, Memory |
-| WebSocket Server | Cross-device connectivity |
-
-## File Structure
-
-```
-hikari/
-├── core/              # Intelligence systems (10 files)
-├── agents/            # Autonomous agents (7 files)
-├── security/          # Authentication & policies (2 files)
-├── skills/            # Extensible skills (1 file)
-├── hikari-frontend/   # Next.js PWA for phone
-├── data/              # Runtime data (auto-created)
-├── hikari.py          # Main entry point
-├── core/server.py     # WebSocket + mobile web UI
-└── install.sh           # One-command setup
+```text
+http://127.0.0.1:9876/connect
+http://127.0.0.1:9876/qr
+http://127.0.0.1:9876/api/status
 ```
 
-## Troubleshooting
+For another device on the same WiFi, replace `127.0.0.1` with the Mac's LAN IP.
 
-**No audio input:**
+## 7. Frontend Check
+
 ```bash
-# macOS: System Preferences > Security > Microphone
-brew install portaudio && pip install pyaudio
+cd /Users/mukeshkrishnamurthy/Documents/HIKARI-projects/HIKARI/hikari-frontend
+npm run lint
+npm run build
 ```
 
-**AI responses fail:**
-- Check `.env` has at least one API key
-- Run `python3 hikari.py --text` for detailed logs
+## 8. Health Check Before Work
 
-**Phone won't connect:**
-- Same WiFi network required
-- Check firewall allows port 8765
-- Use `ifconfig` to find laptop IP
+```bash
+cd /Users/mukeshkrishnamurthy/Documents/HIKARI-projects/HIKARI
+git status --short --branch
+.venv/bin/python hikari.py --help
+printf 'status\nexit\n' | .venv/bin/python hikari.py --text
+.venv/bin/python -m pytest tests -q
+```
 
-## Pro Tips
+Expected baseline:
 
-1. **Talk to HIKARI naturally** - It learns from every conversation
-2. **Use your private codename** when voice isn't working (sick, noisy)
-3. **Ask "what do you know about me"** to see what it's learned
-4. **Say "morning briefing"** for a complete daily update
-5. **Check status** anytime with "status" command
+- Git branch tracks `mukeshkr19/main`.
+- CLI help works.
+- Text `status` works.
+- Neural memory connects when run outside a restricted sandbox.
+- Tests pass.
+- Frontend lint/build pass.
 
-## Next Steps
+## 9. Private Data Rule
 
-1. Add more API keys for better reliability
-2. Customize codename in `.env`
-3. Add your own skills in `skills/`
-4. Build custom agents in `agents/`
+Public repo is source code only. Private runtime state lives at:
 
----
+```text
+/Users/mukeshkrishnamurthy/Documents/HIKARI-projects/HIKARI-private
+```
 
-**Your personal HIKARI assistant is ready.**
+Live brain:
+
+```text
+/Users/mukeshkrishnamurthy/Documents/HIKARI-projects/HIKARI-private/live-brain/hikari_memory.db
+```
+
+Compatibility symlink:
+
+```text
+/Users/mukeshkrishnamurthy/.hikari/brain -> /Users/mukeshkrishnamurthy/Documents/HIKARI-projects/HIKARI-private/live-brain
+```
+
+## 10. Start Here Tomorrow
+
+1. Run the health check.
+2. Fix docs or command drift before feature work.
+3. Add a doctor/status command surface.
+4. Improve one layer at a time: CLI, server, UI, voice, neural memory.
+5. Back up the brain before any memory cleanup.

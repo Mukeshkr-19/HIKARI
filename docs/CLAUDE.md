@@ -1,118 +1,113 @@
-# HIKARI v3 - Personal AI Assistant
+# HIKARI Architecture Notes
+
+This file describes the current repository layout and operating model. It is public project-facing documentation; private recovery notes live in `HIKARI-private/docs/` outside Git.
 
 ## Vision
-The ultimate personal AI assistant that runs 24/7, learns everything about you, controls your Mac, automates your home, and feels like a real companion — not like Siri.
 
-**Core Principles:**
-- Privacy-first: All processing happens locally on your Mac
-- Speed: Instant responses, never makes you wait
-- Personality: Evolves with you, remembers everything, emotionally intelligent
-- Capability: Controls your entire digital life + smart home
+HIKARI is a local-first personal AI assistant for macOS with:
 
-## Architecture
+- text and server modes through `hikari.py`
+- voice/daemon services under `services/`
+- multi-agent task routing under `agents/`
+- core intelligence, memory, server, and integrations under `core/`
+- optional phone/browser frontend under `hikari-frontend/`
+- private live neural brain outside Git
 
+## Current Architecture
+
+```text
+HIKARI/
+├── agents/                  # Voice, research, files, system, code, memory agents
+├── bin/                     # Launchers
+├── config/                  # Provider config
+├── core/
+│   ├── orchestrator.py      # Central coordinator
+│   ├── router.py            # Multi-provider AI routing
+│   ├── server.py            # HTTP/WebSocket server: /api/status, /connect, /qr
+│   ├── voice.py             # Speech I/O helpers
+│   ├── memory.py            # JSON memory fallback
+│   ├── neural_memory/       # SQLite graph memory subsystem
+│   ├── neural_memory_bridge.py
+│   ├── personality.py
+│   ├── mac_control.py
+│   └── smart_home.py
+├── docs/                    # Public docs
+├── hikari-frontend/         # Next.js frontend
+├── scripts/                 # Login-agent helpers
+├── security/                # Auth helpers
+├── services/                # Daemon/tray/always-on entrypoints
+├── skills/                  # Skill system
+├── tests/                   # Pytest suite
+├── hikari.py                # Main entrypoint
+├── install.sh
+├── package.json
+├── requirements-dev.txt
+└── requirements.txt
 ```
-hikari/
-├── brain/                    # HIKARI's persistent memory & learning
-│   ├── memory.py            # Long-term memory system
-│   ├── personality.py       # Adaptive personality engine
-│   ├── emotional_iq.py     # Emotion detection & response adaptation
-│   └── knowledge.py         # Knowledge graph of your world
-├── voice/                    # Voice I/O - always listening
-│   ├── wake_word.py        # Local wake word detection (Pyaudio)
-│   ├── stt.py              # Speech-to-text (Whisper local)
-│   └── tts.py              # Text-to-speech (macOS say)
-├── mac/                      # Mac integration layer
-│   ├── apps.py             # App launching & control
-│   ├── calendar.py         # Calendar events
-│   ├── mail.py            # Email access
-│   ├── notes.py            # Notes integration
-│   ├── reminders.py        # Reminders integration
-│   └── system.py           # System control ( brightness, volume)
-├── agents/                   # Task-specific agents
-│   ├── router.py           # Routes tasks to right agent
-│   ├── research.py         # Web search & research
-│   ├── files.py            # File operations
-│   ├── smart_home.py       # HomeKit/smart device control
-│   └── automation.py       # Task automation
-├── daemon/                   # 24/7 background service
-│   ├── hikari_service.py   # Main daemon service
-│   └── tray.py             # System tray icon & menu
-├── hikari.py                 # Main entry point
-└── core/server.py            # WebSocket for phone connectivity
+
+## Private Runtime Architecture
+
+Private files are not part of the public repo:
+
+```text
+/Users/mukeshkrishnamurthy/Documents/HIKARI-projects/HIKARI-private/
+├── docs/
+├── live-brain/
+├── monthly-backups/
+├── brain-backups/
+├── legacy-data/
+└── scripts/
 ```
 
-## Features
+The live brain is reached through:
 
-### 1. Always Listening Brain
-- Wake word: "Hey HIKARI" or custom
-- Local processing — no cloud for wake detection
-- Learns your voice patterns
-- Remembers everything you've ever said
+```text
+/Users/mukeshkrishnamurthy/.hikari/brain
+```
 
-### 2. Personal Memory
-- Stores every conversation
-- Learns your preferences, habits, relationships
-- Builds a knowledge graph of your life
-- Adapts personality based on interactions
+which points to:
 
-### 3. Mac Control
-- Open/close apps
-- Read calendar, email, notes, reminders
-- Control system settings (volume, brightness)
-- Window management
-- File operations
+```text
+/Users/mukeshkrishnamurthy/Documents/HIKARI-projects/HIKARI-private/live-brain
+```
 
-### 4. Smart Home Integration
-- HomeKit device control
-- Voice control for lights, thermostat, etc.
-- Automation rules
-- Energy monitoring
-
-### 5. Emotional Intelligence
-- Detects mood from voice/text
-- Adapts responses to your emotional state
-- Supports when you're sick (lower sensitivity)
-- Learns communication style
-
-### 6. 24/7 Background Service
-- Runs as system service
-- System tray icon
-- Starts on login
-- Always available
-
-## Quick Start
+## Current Commands
 
 ```bash
-cd HIKARI
-source .venv/bin/activate
-pip install -r requirements.txt
+cd /Users/mukeshkrishnamurthy/Documents/HIKARI-projects/HIKARI
 
-# Run HIKARI
-python3 hikari.py
-
-# Or install as service (24/7)
-python3 hikari.py --install
+.venv/bin/python hikari.py --help
+.venv/bin/python hikari.py --text
+.venv/bin/python hikari.py --server --host 127.0.0.1 --port 9876
+.venv/bin/python hikari.py --daemon
+.venv/bin/python hikari.py --tray
+.venv/bin/python hikari.py --install
 ```
 
-## Voice Commands
-- "Hey HIKARI" - Wake up
-- "What's on my calendar?" - Calendar info
-- "Send an email" - Email dictation
-- "Turn off the lights" - Smart home
-- "Remember I prefer tea" - Store preference
-- "Who am I?" - See what HIKARI knows
+Speaker-locked daemon:
 
-## Privacy
-- All voice processing done locally (Whisper)
-- No data sent to cloud for AI responses (configurable)
-- API keys stored in .env, never in code
-- Optional local LLM via Ollama
+```bash
+.venv/bin/python services/hikari_daemon.py --enroll-voice
+.venv/bin/python services/hikari_daemon.py
+```
 
-## Tech Stack
-- Python 3.12+
-- Whisper (local STT)
-- Ollama (local LLM option)
-- HomeKit (smart home)
-- AppleScript (Mac integration)
-- WebSocket (phone connectivity)
+Frontend:
+
+```bash
+cd hikari-frontend
+npm run lint
+npm run build
+```
+
+## Known Stable Baseline
+
+- `pytest tests -q` passes.
+- `hikari.py --help` works.
+- text mode status works.
+- server `/api/status` works.
+- frontend lint/build passes.
+- neural memory connects outside restricted sandbox.
+
+## Important Caution
+
+Do not move private brain/docs into Git. Do not clean neural-memory data without a backup first. Do not add commands to docs unless they have been verified.

@@ -45,14 +45,13 @@ model_registry.py
 model_switcher.py
 router.py
 
-# Data (keep structure, not content)
+# Runtime data (local only)
 data/*.json
 data/*.bin
 data/voice_auth.json
 data/voice_prints/
 data/voice_memory/
 data/hf_cache/
-!data/.gitkeep
 
 # Local brain/runtime stores
 .hikari/

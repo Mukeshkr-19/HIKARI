@@ -1,199 +1,155 @@
 # HIKARI v2.0 - Personal AI Assistant
 
-> A multi-agent autonomous AI assistant with voice authentication, cross-device connectivity, and multi-provider AI routing.
+HIKARI is a local-first personal AI assistant for macOS. The public repo contains code, tests, docs, scripts, and the optional Next.js frontend. Private runtime state lives outside Git in `HIKARI-private`.
 
-## Features
+## What Works Now
 
-- **Multi-Agent Swarm** - 6 specialized agents (Voice, Research, Files, System, Code, Memory) working autonomously
-- **Multi-Provider AI Routing** - Smart routing across Google, Groq, OpenRouter, Cerebras, DeepSeek, NVIDIA, Cohere
-- **Voice Authentication** - Voice print + configurable codename fallback + clap detection
-- **Cross-Device** - Laptop as brain, phone/watch as interface via WebSocket + QR pairing
-- **File System Access** - Secure, whitelisted file reading and searching
-- **World Awareness** - Real-time news, weather, time, proactive alerts
-- **Memory & Learning** - Persistent conversation history, user preferences, fact learning
-- **Security First** - Encrypted API keys, file access policies, audit logging
+- Python CLI entrypoint: `hikari.py`
+- Text mode: `python hikari.py --text`
+- Server mode: `python hikari.py --server --host 127.0.0.1 --port 9876`
+- HTTP routes: `/api/status`, `/connect`, `/qr`
+- Multi-agent routing: voice, research, files, system, code, memory
+- Neural memory bridge connected through `~/.hikari/brain`
+- Next.js frontend builds and lints
+- Tests pass with Python 3.12
 
-## Quick Start
+## Public Repo Layout
 
-### 1. Install Dependencies
-
-```bash
-cd HIKARI
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+```text
+HIKARI/
+├── agents/             # Agent implementations
+├── bin/                # Launchers, including bin/Hikari
+├── config/             # Provider configuration
+├── core/               # Orchestrator, server, memory, voice, integrations
+├── docs/               # Public project docs
+├── hikari-frontend/    # Optional Next.js frontend
+├── scripts/            # Install/uninstall helper scripts
+├── security/           # Authentication helpers
+├── services/           # Daemon/tray/always-on service entrypoints
+├── skills/             # Built-in skill system
+├── tests/              # Pytest suite
+├── .env.example        # Placeholder environment template
+├── .gitignore
+├── AGENTS.md           # Agent-facing repo context
+├── README.md
+├── hikari.py           # Main CLI/server entrypoint
+├── install.sh
+├── package.json        # npm shortcuts for Python commands
+├── requirements-dev.txt
+└── requirements.txt
 ```
 
-### 2. Set Up API Keys
+## Private Local Layout
+
+These are intentionally not in GitHub:
+
+```text
+/Users/mukeshkrishnamurthy/Documents/HIKARI-projects/HIKARI-private/
+├── docs/               # Private operating guide, roadmap, recovery notes
+├── live-brain/         # Live SQLite neural brain
+├── monthly-backups/    # Scheduled brain backups
+├── brain-backups/      # Older/manual backups
+├── legacy-data/        # Legacy local runtime data
+└── scripts/            # Private backup scripts
+```
+
+Compatibility brain path:
+
+```text
+/Users/mukeshkrishnamurthy/.hikari/brain -> /Users/mukeshkrishnamurthy/Documents/HIKARI-projects/HIKARI-private/live-brain
+```
+
+## Setup
+
+Use Python 3.12. Python 3.14 has caused native dependency install failures for this project.
 
 ```bash
+cd /Users/mukeshkrishnamurthy/Documents/HIKARI-projects/HIKARI
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3.12 -m venv .venv
+.venv/bin/python -m pip install --upgrade pip wheel setuptools
+.venv/bin/python -m pip install -r requirements.txt -r requirements-dev.txt
 cp .env.example .env
-# Edit .env and add your API keys (at least ONE AI provider required)
 ```
 
-**Recommended minimum setup:**
-- `GOOGLE_AI_STUDIO_KEY` - Best free tier (1M context window)
-- `GROQ_API_KEY` - Fastest inference (300+ tokens/sec)
+Edit `.env` and add at least one provider key, for example `GOOGLE_AI_STUDIO_KEY` or `GROQ_API_KEY`.
 
-**Get free API keys:**
-- Google AI Studio: https://aistudio.google.com
-- Groq: https://console.groq.com
-- OpenRouter: https://openrouter.ai
-- Cerebras: https://cloud.cerebras.ai
-- DeepSeek: https://platform.deepseek.com
-- NVIDIA: https://build.nvidia.com
-
-### 3. Run HIKARI
+## Run
 
 ```bash
-# Voice mode (default)
-python3 hikari.py
+cd /Users/mukeshkrishnamurthy/Documents/HIKARI-projects/HIKARI
+
+# CLI help
+.venv/bin/python hikari.py --help
 
 # Text mode
-python3 hikari.py --text
+.venv/bin/python hikari.py --text
 
-# Server only (for phone connections)
-python3 hikari.py --server
+# Server mode
+.venv/bin/python hikari.py --server --host 127.0.0.1 --port 9876
 
-# Custom port
-python3 hikari.py --port 9000
+# Simple always-listening daemon
+.venv/bin/python hikari.py --daemon
+
+# Speaker-locked daemon enrollment and run
+.venv/bin/python services/hikari_daemon.py --enroll-voice
+.venv/bin/python services/hikari_daemon.py
 ```
 
-## Connecting Your Phone
+Phone/server URLs when server mode is running:
 
-1. Start HIKARI on your laptop
-2. Note the IP address and port shown in the terminal
-3. On your phone, open: `http://<your-laptop-ip>:8765/connect`
-4. Or scan the QR code: `http://<your-laptop-ip>:8765/qr`
-5. Enter the 6-digit pairing code shown on your laptop
-
-**Same WiFi network required.** Your laptop is the brain - phone is just an interface.
-
-## Voice Activation
-
-- **Wake Word**: Say "Hikari" to activate
-- **Codename**: Set your own private fallback in `.env`
-- **Clap Detection**: Double-clap to activate (when enabled)
-- **Voice Print**: Train your voice for biometric auth (optional)
-
-## Commands
-
-| Command | Description |
-|---------|-------------|
-| "What's the weather in [city]?" | Get weather info |
-| "Open [app]" | Launch an application |
-| "Open [website]" | Open a website |
-| "What time is it?" | Current time |
-| "What's the news?" | Latest headlines |
-| "Morning briefing" | Full daily briefing |
-| "Read my [file]" | Read a file (whitelisted dirs) |
-| "Search for [query]" | Search files or web |
-| "Remember that [fact]" | Store a fact |
-| "What do you know about me?" | View stored memories |
-| "Status" | System status report |
-| "Exit" / "Goodbye" | Shut down |
-
-## Architecture
-
-```
-hikari/
-├── core/                    # Core systems
-│   ├── orchestrator.py      # Agent swarm manager
-│   ├── router.py            # Multi-provider AI routing
-│   ├── voice.py             # Speech I/O, wake word, clap detection
-│   └── memory.py            # Persistent memory system
-├── agents/                  # Autonomous agents
-│   ├── base.py              # Base agent class
-│   ├── voice.py             # Voice authentication & I/O
-│   ├── research.py          # Web search, news, weather
-│   ├── files.py             # Secure file system access
-│   ├── system.py            # Apps, websites, system info
-│   ├── code.py              # Programming assistance
-│   └── memory_agent.py      # Memory & personalization
-├── security/                # Security layer
-│   └── auth.py              # Voice print, codename, policies
-├── skills/                  # Extensible skills
-├── config/                  # Configuration files
-├── data/                    # Runtime data (memory, voice prints)
-├── hikari-frontend/         # Next.js PWA (optional)
-├── core/server.py           # WebSocket + HTTP server
-├── hikari.py                # Main entry point
-├── requirements.txt         # Python dependencies
-└── .env.example             # Environment template
+```text
+http://127.0.0.1:9876/api/status
+http://127.0.0.1:9876/connect
+http://127.0.0.1:9876/qr
 ```
 
-## AI Provider Routing
+## Frontend
 
-HIKARI intelligently routes requests based on task type:
-
-| Task Type | Provider | Model |
-|-----------|----------|-------|
-| Quick answers | Groq | Llama 3.3 70B |
-| General chat | Google | Gemini 2.0 Flash |
-| Deep reasoning | Google | Gemini 2.5 Pro |
-| Coding | Groq | Qwen3 32B |
-| Math | DeepSeek | DeepSeek Reasoner |
-| Fallback | Cohere | Command R+ |
-
-If a provider fails, HIKARI automatically falls back through the chain.
-
-## Security
-
-- All API keys stored in `.env` (never in code)
-- File access restricted to whitelisted directories
-- Voice prints stored locally, never sent to servers
-- Codename hashed with SHA-256
-- Agent action audit logging
-- Pairing code for device connections
-
-## Customization
-
-### Add a new agent
-
-```python
-# agents/my_agent.py
-from agents.base import BaseAgent
-
-class MyAgent(BaseAgent):
-    def __init__(self):
-        super().__init__("my_agent", "Description")
-
-    def handle(self, user_input: str, context: str = "") -> str:
-        # Your logic here
-        return "Response"
-
-    def can_handle(self, user_input: str) -> float:
-        # Return 0-1 confidence
-        return 0.5
-```
-
-Then register in `core/orchestrator.py`:
-```python
-self.agents["my_agent"] = MyAgent()
-```
-
-### Add a new AI provider
-
-Edit `core/router.py` and add to `PROVIDER_CONFIGS`.
-
-## Troubleshooting
-
-**No audio input:**
 ```bash
-# macOS: Check microphone permissions in System Preferences > Security > Microphone
-# Install PyAudio: brew install portaudio && pip install pyaudio
+cd /Users/mukeshkrishnamurthy/Documents/HIKARI-projects/HIKARI/hikari-frontend
+npm run lint
+npm run build
 ```
 
-**WebSocket connection fails:**
-- Ensure laptop and phone are on the same WiFi
-- Check firewall settings allow port 8765
-- Use `ifconfig` to find your laptop's IP address
+The frontend must not depend on remote Google Fonts during build. Keep fonts local or use system fonts.
 
-**AI responses fail:**
-- Check that at least one API key is set in `.env`
-- Run `python3 hikari.py --text` to see detailed error logs
-- Check provider status with "status" command
+## Verification Before Push
 
-## License
+```bash
+cd /Users/mukeshkrishnamurthy/Documents/HIKARI-projects/HIKARI
 
-MIT - Build something amazing.
+git status --short --branch
+.venv/bin/python hikari.py --help
+printf 'status\nexit\n' | .venv/bin/python hikari.py --text
+.venv/bin/python -m pytest tests -q
+cd hikari-frontend && npm run lint && npm run build
+```
+
+Private-file scan before any public push:
+
+```bash
+git ls-files | rg '(^\.env$|\.db$|\.sqlite|\.sqlite3|^data/|voiceprint|voice_auth|logs/|\.hikari|HIKARI-private|HIKARI_ROADMAP|WORK_DONE|\.claw-workflow|^\.idea/)'
+```
+
+That command should return nothing.
+
+## Never Push
+
+- `.env`
+- `data/`
+- `logs/`
+- `.hikari/`
+- `HIKARI-private/`
+- `.venv/`
+- `.idea/`
+- `*.db`, `*.sqlite`, `*.sqlite3`
+- voice auth, voice prints, raw runtime memory, private roadmap, recovery ledger, or operating notes
+
+## Current Near-Term Priorities
+
+1. Keep the current baseline stable.
+2. Keep public code in GitHub and private memory/docs outside GitHub.
+3. Add a real doctor/status command surface.
+4. Make voice mode reliable and easier to test.
+5. Improve neural memory quality with backup-first cleanup tools.
+6. Add Obsidian as an export/readable layer, not as the source of truth.
