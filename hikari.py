@@ -32,26 +32,21 @@ os.environ["OBJC_DISABLE_INITIALIZE_BRIDGE"] = "1"
 def print_banner():
     banner = dedent(
         """
-        +--------------------------------------------------------------------------+
-        |                                                                          |
-        |   H   H  III  K   K    A    RRRR   III                                  |
-        |   H   H   I   K  K    A A   R   R   I                                   |
-        |   HHHHH   I   KKK    AAAAA  RRRR    I                                   |
-        |   H   H   I   K  K   A   A  R  R    I                                   |
-        |   H   H  III  K   K  A   A  R   R  III                                  |
-        |                                                                          |
-        |                 Your 24/7 AI Assistant - Always Listening                |
-        |                                                                          |
-        +--------------------------------------------------------------------------+
+        +------------------------------------------------------------+
+        |                                                            |
+        |   _   _ ___ _  __    _    ____  ___                       |
+        |  | | | |_ _| |/ /   / \\  |  _ \\|_ _|                      |
+        |  | |_| || || ' /   / _ \\ | |_) || |                       |
+        |  |  _  || || . \\  / ___ \\|  _ < | |                       |
+        |  |_| |_|___|_|\\_\\/_/   \\_\\_| \\_\\___|                      |
+        |                                                            |
+        |          Your 24/7 AI Assistant - Always Listening         |
+        |                                                            |
+        +------------------------------------------------------------+
         """
     ).strip("\n")
 
-    if sys.stdout.isatty() and os.environ.get("NO_COLOR") is None:
-        green = "\033[92m"
-        reset = "\033[0m"
-        print(f"{green}{banner}{reset}\n")
-    else:
-        print(f"{banner}\n")
+    print(f"{banner}\n")
 
 def run_daemon():
     """Run as always-listening service (no wake word needed)"""
